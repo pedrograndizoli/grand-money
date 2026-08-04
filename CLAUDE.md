@@ -395,7 +395,9 @@ Tema claro, `‹ ago/26 ›` no topo. De cima para baixo:
    cartões (gasto / teto). Toda linha abre um sheet de edição, e cada bloco
    termina no botão de criar — **é daqui que saem** conta fixa, teto e cartão,
    fora do onboarding. Conta fixa e teto usam `today/CategorySheet`, cartão usa
-   `CardSheet`, meta usa `MetaSheet` (campos diferentes: total e prazo).
+   `CardSheet`, meta usa `MetaSheet` (campos diferentes: total e prazo). A meta
+   mostra barra de progresso da meta **inteira** (`guardadoTotal / metaTotal`),
+   não do mês.
 6. **Nav inferior (mobile):** hoje · saldos · **+** (FAB preto) · gastos ·
    totais · menu. Item ativo em `accent-500` com barra no topo. Cinco itens é o
    teto: o FAB ocupa uma coluna e não cabe em coluna mais estreita, então uma

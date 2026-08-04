@@ -269,13 +269,19 @@ function AvisoTetos() {
 function Bar({
   value,
   over,
+  tone = 'ink',
   className,
 }: {
   /** 0 a 1 */
   value: number
   over: boolean
+  /** `meta` usa a cor do guardado; `ink` é gasto contra um teto */
+  tone?: 'ink' | 'meta' | 'batida'
   className?: string
 }) {
+  const preenchimento =
+    tone === 'meta' ? 'bg-badge' : tone === 'batida' ? 'bg-income-500' : 'bg-ink-900'
+
   return (
     <div
       className={cn(
@@ -286,7 +292,7 @@ function Bar({
       <div
         className={cn(
           'h-full rounded-full transition-[width] duration-300',
-          over ? 'bg-accent-500' : 'bg-ink-900',
+          over ? 'bg-accent-500' : preenchimento,
         )}
         style={{ width: `${value * 100}%` }}
       />
@@ -493,7 +499,7 @@ function MetaRow({
   const batida = !meta.semPlano && meta.faltaTotal === 0
 
   return (
-    <li className="flex items-center justify-between gap-3 py-3">
+    <li className="flex items-start justify-between gap-3 py-3">
       <button
         type="button"
         onClick={onEditar}
@@ -513,21 +519,24 @@ function MetaRow({
           <span className="mt-0.5 block text-sm text-ink-600 lowercase">
             sem valor ou prazo — não entra na conta do mês
           </span>
-        ) : batida ? (
-          <span className="num mt-0.5 block text-sm text-income-600">
-            {formatBRL(meta.guardadoTotal)}
-            <span className="lowercase"> · meta batida</span>
-          </span>
         ) : (
           <>
             <span className="num mt-0.5 block text-sm text-ink-600">
-              {formatBRL(meta.guardado)} de {formatBRL(meta.previsto)}
-              <span className="lowercase"> neste mês</span>
+              {batida ? (
+                <span className="font-medium text-income-600 lowercase">
+                  meta batida
+                </span>
+              ) : (
+                <>
+                  {formatBRL(meta.guardado)} de {formatBRL(meta.previsto)}
+                  <span className="lowercase"> neste mês</span>
+                </>
+              )}
             </span>
-            <span className="num mt-0.5 block text-sm text-ink-600">
-              {formatBRL(meta.faltaTotal)}
-              <span className="lowercase"> {prazoEmTexto(meta)}</span>
-            </span>
+
+            {/* o progresso é da meta inteira, não do mês: é o que responde
+                "quanto já juntei e quanto ainda falta" */}
+            <Progresso meta={meta} batida={batida} />
           </>
         )}
       </button>
@@ -538,9 +547,42 @@ function MetaRow({
   )
 }
 
+/** Quanto da meta inteira já está guardado, somando todos os meses. */
+function Progresso({ meta, batida }: { meta: MetaStatus; batida: boolean }) {
+  const total = meta.metaTotal ?? 0
+  const fracao = total > 0 ? Math.min(1, meta.guardadoTotal / total) : 0
+
+  return (
+    <>
+      <span className="mt-2 flex items-center gap-3">
+        <Bar
+          value={fracao}
+          over={false}
+          tone={batida ? 'batida' : 'meta'}
+          className="flex-1"
+        />
+        <span className="num shrink-0 text-xs text-ink-600">
+          {Math.round(fracao * 100)}%
+        </span>
+      </span>
+
+      <span className="num mt-1.5 block text-sm text-ink-600">
+        {formatBRL(meta.guardadoTotal)} de {formatBRL(total)}
+        {!batida && (
+          <>
+            <span className="lowercase"> · faltam </span>
+            {formatBRL(meta.faltaTotal)}
+            <span className="lowercase"> {prazoEmTexto(meta)}</span>
+          </>
+        )}
+      </span>
+    </>
+  )
+}
+
 /** O mensal vem de dividir o que falta pelos meses até o prazo — o prazo manda. */
 function prazoEmTexto(meta: MetaStatus): string {
-  if (meta.mesesRestantes === 0) return 'a juntar, com o prazo vencido'
-  if (!meta.dataFinal) return 'a juntar'
-  return `a juntar até ${monthLabel(fromISO(meta.dataFinal))}, em ${meta.mesesRestantes} ${meta.mesesRestantes === 1 ? 'mês' : 'meses'}`
+  if (meta.mesesRestantes === 0) return 'com o prazo vencido'
+  if (!meta.dataFinal) return ''
+  return `até ${monthLabel(fromISO(meta.dataFinal))}, em ${meta.mesesRestantes} ${meta.mesesRestantes === 1 ? 'mês' : 'meses'}`
 }
