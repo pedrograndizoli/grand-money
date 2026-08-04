@@ -12,6 +12,7 @@ interface EntryRow {
   card_id: string | null
   recorrencia: Recurrence
   parcelas: number | null
+  data_fim: string | null
   tags: string[] | null
   created_at: string
 }
@@ -27,6 +28,7 @@ function toDomain(row: EntryRow): Entry {
     cardId: row.card_id ?? null,
     recorrencia: row.recorrencia,
     parcelas: row.parcelas,
+    dataFim: row.data_fim ?? null,
     tags: row.tags ?? [],
     createdAt: row.created_at,
   }
@@ -43,6 +45,12 @@ function toRow(draft: EntryDraft) {
     card_id: draft.tipo === 'saida' ? draft.cardId : null,
     recorrencia: draft.recorrencia,
     parcelas: draft.recorrencia === 'parcelado' ? draft.parcelas : null,
+    // parcelado já tem fim pelo número de parcelas; sem recorrência não há o
+    // que encerrar
+    data_fim:
+      draft.recorrencia === 'nenhuma' || draft.recorrencia === 'parcelado'
+        ? null
+        : draft.dataFim,
     tags: draft.tags,
   }
 }

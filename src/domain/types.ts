@@ -74,6 +74,12 @@ export interface Entry {
   recorrencia: Recurrence
   /** só quando recorrencia = 'parcelado' */
   parcelas: number | null
+  /**
+   * Último dia em que a recorrência ainda vale (YYYY-MM-DD); `null` = sem fim.
+   * Encerrar preenche isto — apagar a regra levaria o histórico junto, porque
+   * as ocorrências passadas são virtuais.
+   */
+  dataFim: string | null
   tags: string[]
   createdAt: string
 }

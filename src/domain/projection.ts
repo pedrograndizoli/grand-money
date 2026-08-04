@@ -38,13 +38,19 @@ export function fromISO(iso: string): Date {
 export function expandEntries(
   entries: Entry[],
   from: Date,
-  to: Date,
+  ate: Date,
 ): Occurrence[] {
   const out: Occurrence[] = []
-  if (to < from) return out
+  if (ate < from) return out
 
   for (const entry of entries) {
     const start = fromISO(entry.data)
+
+    // a recorrência encerrada para de gerar dali em diante, mas o que já caiu
+    // antes continua existindo: é isso que preserva o histórico
+    const encerrada = entry.dataFim ? fromISO(entry.dataFim) : null
+    const to = encerrada !== null && encerrada < ate ? encerrada : ate
+
     const base = {
       entryId: entry.id,
       tipo: entry.tipo,

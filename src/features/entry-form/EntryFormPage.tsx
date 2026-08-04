@@ -9,6 +9,7 @@ import {
   ArrowDownLeft,
   ArrowUpRight,
   Calendar,
+  CalendarOff,
   CalendarSync,
   CreditCard,
   Pencil,
@@ -110,6 +111,7 @@ function EntryForm({ entry }: { entry?: Entry }) {
     entry?.recorrencia ?? 'nenhuma',
   )
   const [parcelas, setParcelas] = useState(entry?.parcelas ?? 2)
+  const [dataFim, setDataFim] = useState<string | null>(entry?.dataFim ?? null)
   const [tags, setTags] = useState<string[]>(entry?.tags ?? [])
   const [categoryId, setCategoryId] = useState<string | null>(
     entry?.categoryId ?? null,
@@ -168,11 +170,14 @@ function EntryForm({ entry }: { entry?: Entry }) {
 
   const saida = tipo === 'saida'
   const salvando = create.isPending || update.isPending
+  // só a repetição sem fim tem o que encerrar: parcelado já acaba sozinho
+  const repeteSemFim =
+    editando && recorrencia !== 'nenhuma' && recorrencia !== 'parcelado'
   const erro = create.error ?? update.error ?? remove.error
 
-  async function submit() {
-    if (valor <= 0 || salvando) return
-    const draft = {
+  /** `fim` sobrescreve a data de encerramento — é o que separa encerrar de salvar */
+  function montarDraft(fim: string | null = dataFim) {
+    return {
       tipo,
       valor,
       descricao: descricao.trim() || null,
@@ -182,13 +187,38 @@ function EntryForm({ entry }: { entry?: Entry }) {
       cardId: tipo === 'saida' ? cardId : null,
       recorrencia,
       parcelas: recorrencia === 'parcelado' ? parcelas : null,
+      dataFim: fim,
       tags,
     }
+  }
+
+  async function submit() {
+    if (valor <= 0 || salvando) return
+    const draft = montarDraft()
     try {
       if (entry) await update.mutateAsync({ id: entry.id, draft })
       else await create.mutateAsync(draft)
     } catch (e) {
       console.error('[grand money] falha ao salvar lançamento', e)
+      return
+    }
+    navigate('/', { replace: true })
+  }
+
+  /**
+   * Encerrar não apaga: marca a data de fim e a recorrência para de gerar dali
+   * em diante. Os meses que já passaram continuam com o lançamento, porque as
+   * ocorrências são virtuais — apagar a regra reescreveria o passado.
+   */
+  async function encerrar() {
+    if (!entry || salvando) return
+    try {
+      await update.mutateAsync({
+        id: entry.id,
+        draft: montarDraft(todayISO()),
+      })
+    } catch (e) {
+      console.error('[grand money] falha ao encerrar recorrência', e)
       return
     }
     navigate('/', { replace: true })
@@ -361,6 +391,48 @@ function EntryForm({ entry }: { entry?: Entry }) {
             chevron
             onClick={() => setSheet('repeticao')}
           />
+
+          {recorrencia !== 'nenhuma' && recorrencia !== 'parcelado' && (
+            <div className="flex items-center gap-4 border-b border-line-dark px-5 py-5">
+              <span className="grid size-7 shrink-0 place-items-center text-white/35">
+                <CalendarOff className="size-5" strokeWidth={2} />
+              </span>
+              <label
+                className="flex-1 text-lg lowercase"
+                htmlFor="fim-da-recorrencia"
+              >
+                repete até
+              </label>
+              {dataFim === null ? (
+                <button
+                  type="button"
+                  onClick={() => setDataFim(todayISO())}
+                  className="text-lg text-white/35 lowercase transition-colors hover:text-white"
+                >
+                  sem fim
+                </button>
+              ) : (
+                <span className="flex items-center gap-2">
+                  <input
+                    id="fim-da-recorrencia"
+                    type="date"
+                    value={dataFim}
+                    min={data}
+                    onChange={(e) => setDataFim(e.target.value || null)}
+                    className="num shrink-0 cursor-pointer bg-transparent text-lg text-white/70 outline-none focus-visible:text-white"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setDataFim(null)}
+                    aria-label="tirar a data de fim"
+                    className="grid size-7 place-items-center rounded-full text-white/45 transition-colors hover:bg-white/10 hover:text-white"
+                  >
+                    <X className="size-4" strokeWidth={2.5} />
+                  </button>
+                </span>
+              )}
+            </div>
+          )}
 
           {recorrencia === 'parcelado' && (
             <div className="flex items-center gap-4 border-b border-line-dark px-5 py-5">
@@ -588,28 +660,41 @@ function EntryForm({ entry }: { entry?: Entry }) {
       <Sheet
         open={sheet === 'apagar'}
         onClose={() => setSheet(null)}
-        title="apagar lançamento?"
+        title={repeteSemFim ? 'parar de repetir?' : 'apagar lançamento?'}
         tone="dark"
       >
         <div className="px-6 py-6">
           <p className="text-base leading-snug text-white/70 lowercase">
-            {recorrencia === 'parcelado'
-              ? `isso apaga as ${parcelas} parcelas, não só a deste mês.`
-              : recorrencia !== 'nenhuma'
-                ? 'isso apaga a repetição inteira, em todos os meses.'
+            {repeteSemFim
+              ? 'encerrar para de repetir de hoje em diante e mantém os meses que já passaram. apagar tira o lançamento de todos eles, inclusive do que já aconteceu.'
+              : recorrencia === 'parcelado'
+                ? `isso apaga as ${parcelas} parcelas, não só a deste mês.`
                 : 'essa ação não tem volta.'}
           </p>
 
           <div className="mt-7 flex flex-col gap-3">
+            {repeteSemFim && (
+              <Button
+                full
+                onClick={() => void encerrar()}
+                disabled={salvando}
+              >
+                {salvando ? 'encerrando…' : 'encerrar hoje'}
+              </Button>
+            )}
             <Button
-              variant="accent"
+              variant={repeteSemFim ? 'outline' : 'accent'}
               full
               onClick={() => void apagar()}
               disabled={remove.isPending}
             >
-              {remove.isPending ? 'apagando…' : 'apagar'}
+              {remove.isPending
+                ? 'apagando…'
+                : repeteSemFim
+                  ? 'apagar tudo, inclusive o passado'
+                  : 'apagar'}
             </Button>
-            <Button variant="outline" full onClick={() => setSheet(null)}>
+            <Button variant="ghost" size="md" full onClick={() => setSheet(null)}>
               cancelar
             </Button>
           </div>

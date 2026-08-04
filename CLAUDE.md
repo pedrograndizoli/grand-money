@@ -129,6 +129,12 @@ livre no instante em que fosse guardado.
 - Lançamentos recorrentes (mensal/semanal/diário/parcelado) são **expandidos em
   ocorrências virtuais** na hora de calcular. Nunca gravar 12 linhas no banco por
   uma despesa mensal: gravar a regra e expandir na leitura.
+- **Encerrar ≠ apagar.** Como a ocorrência passada é virtual, apagar a regra
+  reescreve o histórico: os oito meses de assinatura somem dos totais de meses
+  já fechados. Para parar uma recorrência existe `entries.data_fim` — a regra
+  deixa de gerar dali em diante e o passado fica de pé. A lixeira do formulário
+  oferece `encerrar hoje` primeiro e só depois `apagar tudo, inclusive o
+  passado`. Parcelado não tem o que encerrar: acaba pelo número de parcelas.
 - Arredondamento: calcular em **centavos inteiros** (`number` em centavos), nunca
   em float de reais. Formatar só na borda da UI.
 
@@ -226,6 +232,7 @@ create table entries (
   recorrencia text not null default 'nenhuma'
     check (recorrencia in ('nenhuma','mensal','semanal','diaria','parcelado')),
   parcelas int,                       -- só quando recorrencia = 'parcelado'
+  data_fim date,                      -- último dia da recorrência; null = sem fim
   tags text[] not null default '{}',
   created_at timestamptz not null default now()
 );
@@ -484,8 +491,14 @@ Selecionar "repetição" abre um sheet vindo de baixo com 5 opções, cada uma c
 título e descrição: não repete · mensalmente · semanalmente · diariamente ·
 parcelado (pede número de parcelas e divide o valor).
 
+Repetição sem fim ganha a linha **`repete até`**, que começa em `sem fim` e
+grava `data_fim`. Parcelado não tem essa linha: o fim dele é o número de
+parcelas.
+
 Em modo edição aparece uma lixeira no topo. Recorrência não tem exceção por dia:
-editar ou apagar age sobre a **regra inteira**, e a UI diz isso antes de agir.
+editar age sobre a **regra inteira**, e a UI diz isso antes de agir. Na lixeira,
+repetição sem fim oferece `encerrar hoje` como ação principal e `apagar tudo,
+inclusive o passado` como a destrutiva — apagar reescreveria meses fechados.
 
 ---
 

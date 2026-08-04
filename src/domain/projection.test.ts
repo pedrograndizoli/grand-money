@@ -36,6 +36,7 @@ function entry(over: Partial<Entry>): Entry {
     cardId: null,
     recorrencia: 'nenhuma',
     parcelas: null,
+    dataFim: null,
     tags: [],
     createdAt: '2026-08-01T00:00:00Z',
     ...over,
@@ -863,3 +864,83 @@ describe('saldo de partida é âncora com data', () => {
   })
 })
 
+describe('recorrência encerrada', () => {
+  const netflix = entry({
+    valor: 5990,
+    data: '2026-01-15',
+    recorrencia: 'mensal',
+    dataFim: '2026-08-31',
+  })
+
+  it('gera até a data de fim e para depois dela', () => {
+    const dentro = expandEntries(
+      [netflix],
+      new Date(2026, 7, 1),
+      new Date(2026, 7, 31),
+    )
+    expect(dentro.map((o) => o.data)).toEqual(['2026-08-15'])
+
+    const depois = expandEntries(
+      [netflix],
+      new Date(2026, 8, 1),
+      new Date(2026, 8, 30),
+    )
+    expect(depois).toHaveLength(0)
+  })
+
+  it('o passado continua de pé: encerrar não reescreve mês fechado', () => {
+    const antes = expandEntries(
+      [netflix],
+      new Date(2026, 0, 1),
+      new Date(2026, 6, 31),
+    )
+    // jan a jul, sete ocorrências
+    expect(antes).toHaveLength(7)
+  })
+
+  it('sai da alocação do mês seguinte ao fim, mas fica na do mês do fim', () => {
+    const agosto = alocar([netflix])
+    expect(agosto.gastoLivre).toBe(5990)
+
+    const setembro = allocateMonth({
+      settings,
+      categories: [],
+      cards: [],
+      entries: [netflix],
+      month: new Date(2026, 8, 15),
+      today: HOJE,
+    })
+    expect(setembro.gastoLivre).toBe(0)
+  })
+
+  it('encerrar no meio do mês corta a partir do dia', () => {
+    const diaria = entry({
+      valor: 1000,
+      data: '2026-08-01',
+      recorrencia: 'diaria',
+      dataFim: '2026-08-05',
+    })
+    const occ = expandEntries(
+      [diaria],
+      new Date(2026, 7, 1),
+      new Date(2026, 7, 31),
+    )
+    expect(occ.map((o) => o.data)).toEqual([
+      '2026-08-01',
+      '2026-08-02',
+      '2026-08-03',
+      '2026-08-04',
+      '2026-08-05',
+    ])
+  })
+
+  it('sem data de fim, segue infinita', () => {
+    const semFim = entry({ valor: 5990, data: '2026-01-15', recorrencia: 'mensal' })
+    const longe = expandEntries(
+      [semFim],
+      new Date(2029, 0, 1),
+      new Date(2029, 0, 31),
+    )
+    expect(longe).toHaveLength(1)
+  })
+})

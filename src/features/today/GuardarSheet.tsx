@@ -34,6 +34,7 @@ export function GuardarSheet({ meta, onClose }: GuardarSheetProps) {
       cardId: null,
       recorrencia: 'nenhuma',
       parcelas: null,
+      dataFim: null,
       tags: [],
     })
     onClose()
