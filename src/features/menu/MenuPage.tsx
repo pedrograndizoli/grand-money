@@ -15,7 +15,7 @@ export function MenuPage() {
   const { data: categories } = useCategories()
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
+    <div className="flex min-h-0 flex-1 flex-col lg:mx-auto lg:w-full lg:max-w-3xl">
       <header className="shrink-0 border-b border-ink-300/70 px-5 py-4 lg:px-8">
         <h1 className="text-2xl font-bold tracking-tight lowercase">menu</h1>
       </header>

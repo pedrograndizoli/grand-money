@@ -69,7 +69,7 @@ export function TotalsPage() {
   const aberto = grupos.find((g) => g.id === grupoAberto)
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
+    <div className="flex min-h-0 flex-1 flex-col lg:mx-auto lg:w-full lg:max-w-3xl">
       <header className="flex shrink-0 items-center border-b border-ink-300/70 px-4 py-3 lg:px-6">
         <MonthStepper />
       </header>

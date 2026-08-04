@@ -471,11 +471,24 @@ Mobile-first. Breakpoint único que importa: `lg` (1024px).
 | | mobile | desktop |
 |---|---|---|
 | navegação | bottom nav + FAB | sidebar fixa à esquerda (240px), botão `+ novo` no topo dela |
-| conteúdo | full width | `max-w-3xl` centralizado |
+| conteúdo | full width | shell até `max-w-6xl`; **cada tela escolhe sua largura** |
 | sheets | slide de baixo, full width | modal centralizado, `max-w-md`, fade + scale |
+| lançamento | tela cheia | modal `max-w-md` sobre escurecido |
 | teclado numérico | visível | oculto (`pointer: fine`), teclado do SO |
-| tabela de saldos | 4 colunas compactas | mesmas colunas, mais respiro, hover na linha |
+| tabela de saldos | 4 colunas compactas | `max-w-4xl`, mesmas colunas com mais respiro |
+| listas (gastos, totais, tags, menu) | full width | `max-w-3xl`: linha longa demais é ruim de ler |
+| hoje | uma coluna, blocos empilhados | usa a largura toda: faixa do velocímetro + grid de cards, 2 colunas em `lg` e 3 em `xl` |
 | onboarding | full bleed pink | card branco `max-w-lg` centralizado sobre fundo pink |
+
+**A largura não é do shell, é da tela.** O `AppShell` só põe o teto em `6xl`;
+quem decide é cada página, porque elas querem coisas opostas — a lista quer
+linha curta para ler, o painel de hoje quer espaço para distribuir os cards. Um
+`max-w-3xl` no shell espremia `hoje` numa tira com scroll próprio no meio de um
+monitor vazio.
+
+Nos blocos de `hoje`, a moldura de card (`rounded-2xl` + borda) é **só no
+desktop**: no celular eles seguem chapados, separados por hairline, que já
+estava bom.
 
 Detectar touch com `@media (pointer: coarse)`, não com user-agent nem com
 largura de tela.

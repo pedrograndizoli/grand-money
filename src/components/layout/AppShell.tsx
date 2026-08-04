@@ -18,7 +18,10 @@ export function AppShell() {
     <div className="flex h-svh overflow-hidden bg-surface">
       <Sidebar onNovo={() => setAdicionando(true)} />
       <div className="flex min-w-0 flex-1 flex-col">
-        <main className="relative flex min-h-0 flex-1 flex-col lg:mx-auto lg:w-full lg:max-w-3xl">
+        {/* largura de tela cheia até 6xl: cada tela decide o quanto usa disso.
+            Um max-w-3xl aqui espremia o painel de hoje numa tira com scroll
+            próprio no meio de um monitor vazio. */}
+        <main className="relative flex min-h-0 flex-1 flex-col lg:mx-auto lg:w-full lg:max-w-6xl">
           {/* mora aqui e não em cada header: uma tela nova já nasce com ele */}
           <ThemeToggle className="absolute top-2.5 right-2 z-30 lg:right-3" />
           <Outlet />

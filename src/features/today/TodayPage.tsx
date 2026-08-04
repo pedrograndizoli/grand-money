@@ -70,14 +70,20 @@ export function TodayPage() {
 
       <div className="min-h-0 flex-1 overflow-y-auto">
         {alloc && (
-          <div className="grid items-start gap-x-8 gap-y-9 px-5 py-6 pb-12 lg:grid-cols-2 lg:px-8">
-            <div className="flex flex-col gap-6">
+          <div className="px-5 py-6 pb-12 lg:px-8">
+            {/* faixa do velocímetro: no desktop o ritmo anda ao lado do diário
+                em vez de empilhar e deixar meia tela vazia */}
+            <div className="grid gap-6 lg:grid-cols-[minmax(0,20rem)_minmax(0,1fr)] lg:items-stretch lg:gap-8">
               <Hero alloc={alloc} />
-              <Ritmo alloc={alloc} />
-              {alloc.tetosAcimaDoDisponivel && <AvisoTetos />}
+              <div className="flex flex-col justify-center gap-5 lg:rounded-2xl lg:border lg:border-ink-300/60 lg:p-6">
+                <Ritmo alloc={alloc} />
+                {alloc.tetosAcimaDoDisponivel && <AvisoTetos />}
+              </div>
             </div>
 
-            <div className="flex flex-col gap-8">
+            {/* os blocos viram cards e se distribuem: um monólito de 30 linhas
+                numa coluna só é o que deixava o desktop confuso */}
+            <div className="mt-9 grid items-start gap-6 lg:mt-10 lg:grid-cols-2 xl:grid-cols-3">
               <Bloco title="tetos flexíveis">
                 {alloc.flexiveis.map((f) => (
                   <FlexRow
@@ -314,7 +320,7 @@ function NovoBotao({ onClick, label }: { onClick: () => void; label: string }) {
 
 function Bloco({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <section>
+    <section className="lg:rounded-2xl lg:border lg:border-ink-300/60 lg:p-5">
       <h2 className="text-sm text-ink-600 lowercase">{title}</h2>
       <ul className="mt-1 divide-y divide-ink-300/50">{children}</ul>
     </section>
@@ -460,7 +466,9 @@ function FixedRow({
               aria-hidden
             />
           </span>
-          <span className="mt-0.5 block truncate text-sm text-ink-600 lowercase">
+          {/* sem truncate: esconder "r$ 319,13 pagos" no meio da frase é pior
+              do que a linha quebrar em duas */}
+          <span className="mt-0.5 block text-sm leading-snug text-ink-600 lowercase">
             {fixa.diaVencimento !== null && `vence dia ${fixa.diaVencimento}`}
             {fixa.estimado &&
               (fixa.diaVencimento !== null ? ' · valor varia' : 'valor varia')}

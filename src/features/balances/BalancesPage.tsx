@@ -55,7 +55,7 @@ export function BalancesPage() {
     proj?.dias.find((d) => d.data === diaAberto)?.occurrences ?? []
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
+    <div className="flex min-h-0 flex-1 flex-col lg:mx-auto lg:w-full lg:max-w-4xl">
       <header className="flex shrink-0 items-center gap-2 border-b border-ink-300/70 px-3 py-3 pr-14 lg:px-6 lg:pr-16">
         <TodayBadge day={today.getDate()} onClick={goToToday} />
         <MonthStepper />
