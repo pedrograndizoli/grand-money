@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { format } from 'date-fns'
+import { ptBR } from 'date-fns/locale'
 import { formatBRL, formatCents } from '../../domain/money'
-import { projectMonth } from '../../domain/projection'
+import { fromISO, projectMonth } from '../../domain/projection'
 import type { Allocation, DayProjection, MonthProjection } from '../../domain/projection'
 import { useCategories } from '../../hooks/useCategories'
 import { useCards } from '../../hooks/useCards'
@@ -9,7 +11,7 @@ import { useSettings } from '../../hooks/useSettings'
 import { useMonth } from '../../store/useMonth'
 import { MonthStepper } from '../../components/layout/MonthStepper'
 import { cn } from '../../lib/cn'
-import { DayEntriesSheet } from './DayEntriesSheet'
+import { EntriesSheet } from '../../components/ui/EntriesSheet'
 import { LegendButton } from './LegendButton'
 import { TodayBadge } from './TodayBadge'
 
@@ -91,8 +93,13 @@ export function BalancesPage() {
         )}
       </div>
 
-      <DayEntriesSheet
-        date={diaAberto}
+      <EntriesSheet
+        open={diaAberto !== null}
+        title={
+          diaAberto
+            ? format(fromISO(diaAberto), "d 'de' MMMM", { locale: ptBR }).toLowerCase()
+            : ''
+        }
         occurrences={doDiaAberto}
         onClose={() => setDiaAberto(null)}
       />

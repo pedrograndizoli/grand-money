@@ -1,42 +1,47 @@
 import { useNavigate } from 'react-router-dom'
 import { format } from 'date-fns'
-import { ptBR } from 'date-fns/locale'
 import { ArrowDownLeft, ArrowUpRight, ChevronRight, Wallet } from 'lucide-react'
-import { Sheet } from '../../components/ui/Sheet'
+import { Sheet } from './Sheet'
 import { formatBRL } from '../../domain/money'
 import { fromISO } from '../../domain/projection'
 import type { Occurrence } from '../../domain/types'
-import { recurrenceLabel } from '../entry-form/recurrence'
+import { recurrenceLabel } from '../../features/entry-form/recurrence'
 import { cn } from '../../lib/cn'
 
-interface DayEntriesSheetProps {
-  /** YYYY-MM-DD do dia aberto, ou null quando fechado */
-  date: string | null
+interface EntriesSheetProps {
+  open: boolean
+  title: string
   occurrences: Occurrence[]
+  /** mostra a data em cada linha — só faz sentido quando a lista cruza dias */
+  comData?: boolean
   onClose: () => void
 }
 
-export function DayEntriesSheet({
-  date,
+/** Lista de lançamentos que leva à edição de cada um. Serve o dia e o grupo. */
+export function EntriesSheet({
+  open,
+  title,
   occurrences,
+  comData = false,
   onClose,
-}: DayEntriesSheetProps) {
+}: EntriesSheetProps) {
   const navigate = useNavigate()
 
-  const titulo = date
-    ? format(fromISO(date), "d 'de' MMMM", { locale: ptBR }).toLowerCase()
-    : ''
-
   return (
-    <Sheet open={date !== null} onClose={onClose} title={titulo}>
+    <Sheet open={open} onClose={onClose} title={title}>
       <ul>
         {occurrences.map((o, i) => {
           const entrada = o.tipo === 'entrada'
-          const detalhe = o.parcela
-            ? `parcela ${o.parcela.atual} de ${o.parcela.total}`
-            : o.recorrencia !== 'nenhuma'
-              ? recurrenceLabel(o.recorrencia)
-              : null
+          const detalhe = [
+            comData ? format(fromISO(o.data), 'dd/MM') : null,
+            o.parcela
+              ? `parcela ${o.parcela.atual} de ${o.parcela.total}`
+              : o.recorrencia !== 'nenhuma'
+                ? recurrenceLabel(o.recorrencia)
+                : null,
+          ]
+            .filter(Boolean)
+            .join(' · ')
 
           return (
             <li key={`${o.entryId}-${i}`}>
@@ -100,7 +105,9 @@ export function DayEntriesSheet({
       </ul>
 
       <p className="px-6 py-5 text-sm text-ink-600 lowercase">
-        toque num lançamento para editar ou apagar.
+        {occurrences.length === 0
+          ? 'nenhum lançamento aqui neste mês.'
+          : 'toque num lançamento para editar ou apagar.'}
       </p>
     </Sheet>
   )

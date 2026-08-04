@@ -381,16 +381,17 @@ O teclado numérico customizado (3×4, com apagar) aparece **só em touch**, e
 alimenta um campo por vez — `valor` ou `dia`, conforme o último tocado. No
 desktop os inputs recebem foco e usam o teclado real.
 
-### 5.3 Alocação (`/`) — tela principal
-Tema claro, `‹ ago/26 ›` no topo. De cima para baixo:
+### 5.3 Hoje (`/`) — tela principal
+Tema claro, título `hoje` e a data por extenso. Sempre o **mês corrente**: hoje
+não existe em outro mês, então esta tela não tem navegação de mês.
 
 1. **Herói:** o diário em display grande sobre `--color-positive`, com
-   `R$ x livres para N dias` embaixo, e a linha de ritmo do dia. Em déficit, vira
-   `falta entrar R$ x` sobre `--color-negative`, sem diário.
-2. **Aviso** quando `tetosAcimaDoDisponivel`.
-3. **o mês até aqui:** recebido · gasto livre · pago em fixas · guardado.
-4. **comprometido:** fixas a pagar · ainda a guardar · **livre**.
-5. **Blocos por tipo de categoria:** contas fixas (vencimento, selo de estado e
+   `R$ x livres para N dias` embaixo. Em déficit, vira `falta entrar R$ x`,
+   sem diário.
+2. **Ritmo do dia:** quanto do diário de hoje já foi usado, com barra. É
+   indicador, nunca "economizado".
+3. **Aviso** quando `tetosAcimaDoDisponivel`.
+4. **Blocos por tipo de categoria:** contas fixas (vencimento, selo de estado e
    pendente), tetos flexíveis (barra de uso), metas (guardado / previsto) e
    cartões (gasto / teto). Toda linha abre um sheet de edição, e cada bloco
    termina no botão de criar — **é daqui que saem** conta fixa, teto e cartão,
@@ -398,10 +399,18 @@ Tema claro, `‹ ago/26 ›` no topo. De cima para baixo:
    `CardSheet`, meta usa `MetaSheet` (campos diferentes: total e prazo). A meta
    mostra barra de progresso da meta **inteira** (`guardadoTotal / metaTotal`),
    não do mês.
-6. **Nav inferior (mobile):** hoje · saldos · **+** (FAB preto) · gastos ·
+5. **Nav inferior (mobile):** hoje · saldos · **+** (FAB preto) · gastos ·
    totais · menu. Item ativo em `accent-500` com barra no topo. Cinco itens é o
    teto: o FAB ocupa uma coluna e não cabe em coluna mais estreita, então uma
    tela nova no rodapé empurra outra para o menu.
+
+### 5.4 Saldos (`/saldos`) — o mês dia a dia
+Tabela navegável por mês, quatro colunas: **dia · lançamentos · diário · saldo**.
+`TodayBadge` volta para o mês corrente, `LegendButton` explica as cores, e o dia
+de hoje é centralizado ao abrir. A coluna de saldo é o `livre` queimando o
+diário (`projectMonth`), com fundo `--color-positive`/`--color-negative` por
+célula; dia já passado não tem projeção, mostra só o que aconteceu. Tocar num
+dia com lançamento abre o `EntriesSheet`.
 
 ### 5.5 Gastos do mês (`/gastos`)
 Lista das saídas do mês visível em duas seções: **a pagar** (contas fixas com
@@ -414,12 +423,20 @@ lançamento existir com data até hoje; "a pagar" é `valor_previsto − pago` d
 categoria fixa. Tocar numa linha de lançamento abre a edição dele.
 `guardado` não aparece: não é gasto.
 
-> Esta tela é provisória. A visão dia a dia (tabela com selo `D`, saldo por dia,
-> cores por linha) saiu do modelo — os componentes dela seguem em
-> `features/balances/` (`TodayBadge`, `LegendButton`, `DayEntriesSheet`)
-> aguardando virar uma tela à parte. Não apague sem combinar.
+### 5.6 Totais (`/totais`)
+Hero com o livre do mês, saldo de partida e **movimentações do mês**: uma linha
+por destino do dinheiro, com ícone circular colorido, contagem e total —
+entradas · gasto livre · contas fixas · guardado · no cartão. Cada linha abre o
+`EntriesSheet` com os lançamentos daquele grupo, e cada lançamento leva à
+edição. Abaixo, o que ainda está comprometido e os totais por categoria e por
+cartão.
 
-### 5.4 Lançamento (`/lancamento/novo` e `/lancamento/:id`)
+O total de cada grupo é a soma do que está listado dentro dele — abrir e
+conferir fecha a conta. **`no cartão` é recorte, não fluxo**: aquelas saídas já
+estão contadas em gasto livre ou contas fixas, e a linha diz isso. Somar as
+cinco linhas não dá o gasto do mês.
+
+### 5.7 Lançamento (`/lancamento/novo` e `/lancamento/:id`)
 Tema **escuro**, contrastando com o resto do app. Valor grande no topo, depois
 linhas separadas por hairline: tipo, categoria, cartão, descrição, data,
 repetição, tags. Botão laranja no rodapé. Teclado numérico embaixo (touch).
