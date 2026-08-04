@@ -1,16 +1,19 @@
 import { useState } from 'react'
 import { Button } from '../../components/ui/Button'
 import { Sheet } from '../../components/ui/Sheet'
+import { PasswordInput } from '../../components/ui/PasswordInput'
 import { supabase } from '../../lib/supabase'
 import { cn } from '../../lib/cn'
 
 const MINIMO = 6
 
 const CAMPO = cn(
-  'mt-1 w-full border-b border-line-dark bg-transparent py-2',
+  'w-full border-b border-line-dark bg-transparent py-2',
   'text-xl font-medium outline-none',
   'placeholder:font-normal placeholder:text-white/30 focus:border-white/45',
 )
+
+const ROTULO = 'mb-1 block text-xs font-semibold text-white/45 lowercase'
 
 /**
  * Define ou troca a senha da conta que já está logada. Não cria usuário: o
@@ -58,11 +61,8 @@ export function SenhaSheet({ onClose }: { onClose: () => void }) {
           </>
         ) : (
           <>
-            <label className="block text-xs font-semibold text-white/45 lowercase">
-              nova senha
-            </label>
-            <input
-              type="password"
+            <label className={ROTULO}>nova senha</label>
+            <PasswordInput
               autoComplete="new-password"
               placeholder={`mínimo ${MINIMO} caracteres`}
               value={senha}
@@ -70,11 +70,8 @@ export function SenhaSheet({ onClose }: { onClose: () => void }) {
               className={CAMPO}
             />
 
-            <label className="mt-6 block text-xs font-semibold text-white/45 lowercase">
-              repita a senha
-            </label>
-            <input
-              type="password"
+            <label className={cn(ROTULO, 'mt-6')}>repita a senha</label>
+            <PasswordInput
               autoComplete="new-password"
               placeholder="a mesma de novo"
               value={confirma}

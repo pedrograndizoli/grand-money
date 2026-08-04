@@ -305,7 +305,8 @@ src/
     useMonth.ts            mês visível
     useTheme.ts            claro/escuro, persistido no localStorage
   components/
-    ui/                    Button, Sheet, Field, NumericKeypad, MoneyInput, StatusPill...
+    ui/                    Button, Sheet, Field, NumericKeypad, MoneyInput,
+                           PasswordInput, StatusPill...
     layout/                AppShell, BottomNav, Sidebar, MonthStepper, BrandScreen, ThemeToggle
   features/
     auth/                  tela /entrar + RequireAuth

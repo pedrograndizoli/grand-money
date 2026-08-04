@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { Mail } from 'lucide-react'
 import { BrandScreen } from '../../components/layout/BrandScreen'
 import { Button } from '../../components/ui/Button'
+import { PasswordInput } from '../../components/ui/PasswordInput'
 import { supabase } from '../../lib/supabase'
 import { APP } from '../../config/app'
 
@@ -145,8 +146,7 @@ export function LoginPage() {
 
         <label className="mt-6 block">
           <span className="sr-only">senha</span>
-          <input
-            type="password"
+          <PasswordInput
             autoComplete="current-password"
             placeholder="sua senha"
             value={senha}
