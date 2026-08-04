@@ -782,3 +782,84 @@ describe('conta fixa de valor variável', () => {
     expect(a.livre).toBe(180000)
   })
 })
+
+describe('saldo de partida é âncora com data', () => {
+  // R$ 1.000 no começo do dia 10/08
+  const ancora: Settings = {
+    saldoInicial: 100000,
+    saldoRef: '2026-08-10',
+    updatedAt: '2026-08-10T00:00:00Z',
+  }
+
+  const comAncora = (entries: Entry[], month = MES) =>
+    allocateMonth({
+      settings: ancora,
+      categories: [],
+      cards: [],
+      entries,
+      month,
+      today: HOJE,
+    })
+
+  it('sem lançamento entre as datas, a âncora vale igual em qualquer mês', () => {
+    expect(comAncora([]).saldoAbertura).toBe(100000)
+    expect(comAncora([], new Date(2026, 8, 15)).saldoAbertura).toBe(100000)
+    expect(comAncora([], new Date(2026, 6, 15)).saldoAbertura).toBe(100000)
+  })
+
+  it('no mês da âncora, desconta o que se moveu antes dela', () => {
+    // os 300 do dia 3 já estão dentro dos 1.000 informados no dia 10
+    const a = comAncora([
+      entry({ tipo: 'entrada', valor: 30000, data: '2026-08-03' }),
+    ])
+    expect(a.saldoAbertura).toBe(70000)
+    // e o mês soma os 300 de volta: a entrada conta uma vez só
+    expect(a.livre).toBe(100000)
+  })
+
+  it('o dia da âncora conta normalmente: o saldo é do começo do dia', () => {
+    const a = comAncora([
+      entry({ tipo: 'entrada', valor: 5000, data: '2026-08-10' }),
+    ])
+    expect(a.saldoAbertura).toBe(100000)
+    expect(a.livre).toBe(105000)
+  })
+
+  it('o mês seguinte abre com o que sobrou, não com a âncora de novo', () => {
+    const setembro = comAncora(
+      [
+        entry({ tipo: 'entrada', valor: 50000, data: '2026-08-20' }),
+        entry({ id: 'e2', valor: 20000, data: '2026-08-25' }),
+      ],
+      new Date(2026, 8, 15),
+    )
+    expect(setembro.saldoAbertura).toBe(130000)
+  })
+
+  it('o mês anterior volta atrás pelos lançamentos', () => {
+    // a entrada de julho já está dentro da âncora de agosto
+    const julho = comAncora(
+      [entry({ tipo: 'entrada', valor: 40000, data: '2026-07-28' })],
+      new Date(2026, 6, 15),
+    )
+    expect(julho.saldoAbertura).toBe(60000)
+  })
+
+  it('guardado sai do saldo: é dinheiro que deixou a conta', () => {
+    const setembro = comAncora(
+      [entry({ id: 'g1', tipo: 'guardado', valor: 30000, data: '2026-08-15' })],
+      new Date(2026, 8, 15),
+    )
+    expect(setembro.saldoAbertura).toBe(70000)
+  })
+
+  it('recorrência entre as datas conta em cada ocorrência', () => {
+    // mensal de 100 a partir de 10/08: ago, set e out caem antes de novembro
+    const novembro = comAncora(
+      [entry({ valor: 10000, data: '2026-08-10', recorrencia: 'mensal' })],
+      new Date(2026, 10, 15),
+    )
+    expect(novembro.saldoAbertura).toBe(70000)
+  })
+})
+

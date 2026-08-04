@@ -82,6 +82,7 @@ barra. Nada disso entra na conta do `livre`.
 Em `src/domain/projection.ts`, função `allocateMonth`:
 
 ```
+saldoAbertura  = saldo no dia 1 do mês visível, caminhando do `saldo_ref`
 recebido       = soma das entradas do mês até hoje
 gastoLivre     = saídas em categorias flexíveis ou sem categoria
 pagoFixas      = saídas em categorias fixas
@@ -90,11 +91,23 @@ pendenteFixas  = Σ pendente das categorias fixas  (ver conta de valor variável
 reservaMeta    = Σ max(0, mensal − guardado)   das categorias meta
                  (mensal calculado do total e do prazo, ver acima)
 
-livre  = saldoInicial + recebido − gastoLivre − pagoFixas − guardado
-                      − pendenteFixas − reservaMeta
+livre  = saldoAbertura + recebido − gastoLivre − pagoFixas − guardado
+                       − pendenteFixas − reservaMeta
 
 diario = livre / diasRestantesNoMes            (hoje conta)
 ```
+
+**O saldo de partida é âncora com data, não um número que se repete.**
+`saldo_inicial` vale no **início do dia** `saldo_ref`; para qualquer outro mês,
+o motor caminha pelos lançamentos entre as duas datas — para frente somando,
+para trás subtraindo. Sem isso, abrir setembro somava de novo o dinheiro que já
+tinha sido contado em agosto, e o próprio mês de referência contava duas vezes
+tudo que caiu entre o dia 1 e o `saldo_ref`.
+
+O dia do `saldo_ref` conta normalmente dentro do mês. A leitura oposta (o saldo
+já inclui o dia inteiro) erraria toda vez que se gasta algo mais tarde no mesmo
+dia, que é o caso comum; esta erra só ao catalogar, depois do onboarding, algo
+que aconteceu mais cedo naquele mesmo dia.
 
 Realizado e compromisso entram os dois, e é o que mantém a conta estável: a fixa
 desconta o que já foi pago **mais** o que ainda falta, e a meta segue a mesma

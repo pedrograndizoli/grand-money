@@ -93,7 +93,7 @@ export function TotalsPage() {
               </p>
             </section>
 
-            <Line label="saldo de partida" value={settings!.saldoInicial} />
+            <Line label="saldo no início do mês" value={alloc.saldoAbertura} />
 
             <h2 className="px-5 pt-8 pb-2 text-sm text-ink-600 lowercase lg:px-8">
               movimentações do mês

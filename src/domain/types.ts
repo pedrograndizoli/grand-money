@@ -81,7 +81,10 @@ export interface Entry {
 export type EntryDraft = Omit<Entry, 'id' | 'createdAt'>
 
 export interface Settings {
-  /** saldo informado pelo usuário na data `saldoRef` */
+  /**
+   * Âncora: o saldo no **início do dia** `saldoRef`. Não é o saldo de todo mês
+   * — o motor caminha pelos lançamentos para chegar a qualquer outro mês.
+   */
   saldoInicial: Cents
   /** YYYY-MM-DD */
   saldoRef: string

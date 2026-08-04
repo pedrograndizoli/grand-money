@@ -192,6 +192,8 @@ export interface CardUsage {
 }
 
 interface AllocationBase {
+  /** o saldo no primeiro dia do mês, caminhando do `saldoRef` até aqui */
+  saldoAbertura: Cents
   /** entradas do mês até hoje */
   recebido: Cents
   /** saídas em categorias flexíveis ou sem categoria */
@@ -245,6 +247,40 @@ export interface AllocateMonthArgs {
 }
 
 /**
+ * O saldo no primeiro dia do mês visível.
+ *
+ * `saldoInicial` é uma **âncora com data**, não um número que se repete: vale
+ * no início do dia `saldoRef`. Para chegar a outro mês, caminha-se pelos
+ * lançamentos entre as duas datas — para frente somando, para trás
+ * subtraindo. Sem isso, abrir setembro somava de novo o dinheiro que já tinha
+ * sido contado em agosto, e o mês de referência contava duas vezes tudo que
+ * caiu entre o dia 1 e o `saldoRef`.
+ *
+ * O dia do `saldoRef` conta **normalmente** dentro do mês: o saldo é o do
+ * começo daquele dia. A leitura oposta (já inclui o dia) erraria toda vez que
+ * se gasta algo mais tarde no mesmo dia, que é o caso comum.
+ */
+function saldoDeAbertura(
+  entries: Entry[],
+  settings: Settings,
+  inicio: Date,
+): Cents {
+  const ref = fromISO(settings.saldoRef)
+  const paraFrente = inicio > ref
+
+  // janela entre as duas datas, sempre com o extremo de destino de fora
+  const de = paraFrente ? ref : inicio
+  const ate = addDays(paraFrente ? inicio : ref, -1)
+
+  let movimento = 0
+  for (const o of expandEntries(entries, de, ate)) {
+    movimento += o.tipo === 'entrada' ? o.valor : -o.valor
+  }
+
+  return settings.saldoInicial + (paraFrente ? movimento : -movimento)
+}
+
+/**
  * Quanto já foi guardado em cada meta antes do mês visível. O plano mensal se
  * refaz em cima do que falta: um mês em que se guardou a mais alivia os
  * seguintes, e um mês pulado se dilui nos que sobraram.
@@ -279,8 +315,8 @@ function diasRestantesNoMes(month: Date, today: Date): number {
 /**
  * A conta central do app.
  *
- *   livre  = saldoInicial + recebido − gastoLivre − pagoFixas − guardado
- *                         − pendenteFixas − reservaMeta
+ *   livre  = saldoAbertura + recebido − gastoLivre − pagoFixas − guardado
+ *                          − pendenteFixas − reservaMeta
  *   diario = livre / diasRestantes
  *
  * Compromissos e realizações entram os dois: uma fixa desconta o que já foi
@@ -428,8 +464,10 @@ export function allocateMonth({
     }
   })
 
+  const saldoAbertura = saldoDeAbertura(entries, settings, inicio)
+
   const livre =
-    settings.saldoInicial +
+    saldoAbertura +
     recebido -
     gastoLivre -
     pagoFixas -
@@ -446,6 +484,7 @@ export function allocateMonth({
   )
 
   const base: AllocationBase = {
+    saldoAbertura,
     recebido,
     gastoLivre,
     gastoLivreHoje,
