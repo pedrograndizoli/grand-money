@@ -66,7 +66,8 @@ export function OnboardingPage() {
    * em vez de duplicar — tocar duas vezes no chip "aluguel" é corrigir, não criar.
    */
   function commit(): CategoryDraft[] {
-    if (current.kind !== 'categorias' || !isFilled(form)) return categorias
+    if (current.kind !== 'categorias' || !isFilled(form, current.tipo))
+      return categorias
 
     const draft = toDraft(form, current.tipo)
     const chave = draft.nome.toLowerCase()

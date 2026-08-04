@@ -12,6 +12,7 @@ import {
 } from 'date-fns'
 import { splitCents } from './money'
 import type {
+  Card,
   Category,
   Cents,
   Entry,
@@ -49,6 +50,7 @@ export function expandEntries(
       tipo: entry.tipo,
       descricao: entry.descricao,
       categoryId: entry.categoryId,
+      cardId: entry.cardId,
       tags: entry.tags,
       recorrencia: entry.recorrencia,
     }
@@ -127,17 +129,66 @@ export interface FixedStatus {
   /** a conta é paga pelos próprios lançamentos — não existe flag de status */
   pago: Cents
   pendente: Cents
+  /** o previsto é só uma estimativa: qualquer pagamento no mês fecha a conta */
+  estimado: boolean
   diaVencimento: number | null
 }
 
 export interface MetaStatus {
   categoryId: string
   nome: string
+  /** quanto guardar neste mês — calculado do que falta e do prazo, não digitado */
   previsto: Cents
+  /** guardado dentro do mês visível */
   guardado: Cents
   /** o que ainda falta guardar no mês */
   reserva: Cents
+  /** o total a juntar */
   metaTotal: Cents | null
+  /** o prazo, YYYY-MM-DD */
+  dataFinal: string | null
+  /** guardado em todos os meses, o visível incluído */
+  guardadoTotal: Cents
+  /** o que falta para fechar a meta inteira */
+  faltaTotal: Cents
+  /** meses de cobrança contando o visível; 0 = prazo vencido */
+  mesesRestantes: number
+  /** sem total ou sem prazo não dá para calcular o mensal: a meta não reserva nada */
+  semPlano: boolean
+}
+
+/**
+ * Quanto guardar neste mês para fechar `falta` até o prazo, com o mês visível
+ * contando. Arredonda **para cima**: por baixo a soma dos meses não fecha a
+ * meta. No último mês — ou com o prazo vencido — cai tudo de uma vez, senão a
+ * meta sumiria da conta justo quando mais aperta.
+ */
+export function mensalDaMeta(
+  falta: Cents,
+  dataFinal: string | null,
+  month: Date,
+): Cents {
+  if (falta <= 0 || !dataFinal) return 0
+  const meses = differenceInCalendarMonths(fromISO(dataFinal), month) + 1
+  if (meses <= 1) return falta
+  return Math.ceil(falta / meses)
+}
+
+/** Meses de cobrança que ainda restam, contando o visível. 0 = prazo vencido. */
+export function mesesAtePrazo(dataFinal: string | null, month: Date): number {
+  if (!dataFinal) return 0
+  return Math.max(0, differenceInCalendarMonths(fromISO(dataFinal), month) + 1)
+}
+
+export interface CardUsage {
+  cardId: string
+  nome: string
+  /** 0 = cartão sem teto definido */
+  limite: Cents
+  gasto: Cents
+  /** negativo quando passou do teto; 0 em cartão sem teto */
+  restante: Cents
+  acimaDoLimite: boolean
 }
 
 interface AllocationBase {
@@ -160,6 +211,12 @@ interface AllocationBase {
   fixas: FixedStatus[]
   flexiveis: FlexAllocation[]
   metas: MetaStatus[]
+  /**
+   * Gasto do mês por cartão contra o teto de cada um. O teto do cartão não
+   * reserva nem adia dinheiro — a saída no cartão já saiu do livre no dia dela.
+   * É um aviso, como o teto flexível.
+   */
+  cartoes: CardUsage[]
   /** os tetos flexíveis restantes somam mais do que sobrou */
   tetosAcimaDoDisponivel: boolean
 }
@@ -180,10 +237,33 @@ export type Allocation =
 export interface AllocateMonthArgs {
   settings: Settings
   categories: Category[]
+  cards: Card[]
   entries: Entry[]
   /** qualquer data dentro do mês visível */
   month: Date
   today: Date
+}
+
+/**
+ * Quanto já foi guardado em cada meta antes do mês visível. O plano mensal se
+ * refaz em cima do que falta: um mês em que se guardou a mais alivia os
+ * seguintes, e um mês pulado se dilui nos que sobraram.
+ */
+function guardadoAntesDoMes(entries: Entry[], inicio: Date): Map<string, Cents> {
+  const total = new Map<string, Cents>()
+  const guardados = entries.filter((e) => e.tipo === 'guardado' && e.categoryId)
+  if (guardados.length === 0) return total
+
+  const primeiro = guardados.reduce(
+    (min, e) => (e.data < min ? e.data : min),
+    guardados[0].data,
+  )
+
+  for (const o of expandEntries(guardados, fromISO(primeiro), addDays(inicio, -1))) {
+    if (!o.categoryId) continue
+    total.set(o.categoryId, (total.get(o.categoryId) ?? 0) + o.valor)
+  }
+  return total
 }
 
 /**
@@ -207,10 +287,15 @@ function diasRestantesNoMes(month: Date, today: Date): number {
  * pago (`pagoFixas`) mais o que ainda falta (`pendenteFixas`), e a meta segue a
  * mesma simetria com `guardado` e `reservaMeta`. Sem o termo `guardado` o
  * dinheiro voltaria ao bolo livre no instante em que fosse guardado.
+ *
+ * A parcela mensal da meta não é digitada: vem de `mensalDaMeta`, o que falta
+ * juntar dividido pelos meses até o prazo. Meta sem total ou sem prazo não
+ * reserva nada.
  */
 export function allocateMonth({
   settings,
   categories,
+  cards,
   entries,
   month,
   today,
@@ -233,6 +318,7 @@ export function allocateMonth({
 
   const gastoPorCategoria = new Map<string, Cents>()
   const guardadoPorCategoria = new Map<string, Cents>()
+  const gastoPorCartao = new Map<string, Cents>()
   const soma = (m: Map<string, Cents>, k: string, v: Cents) =>
     m.set(k, (m.get(k) ?? 0) + v)
 
@@ -253,6 +339,8 @@ export function allocateMonth({
 
     // saída
     if (o.categoryId) soma(gastoPorCategoria, o.categoryId, o.valor)
+    // o cartão é só a forma de pagamento: não muda para onde a saída vai
+    if (o.cardId) soma(gastoPorCartao, o.cardId, o.valor)
     if (cat?.tipo === 'fixa') {
       pagoFixas += o.valor
     } else {
@@ -264,13 +352,18 @@ export function allocateMonth({
   const fixas: FixedStatus[] = []
   const flexiveis: FlexAllocation[] = []
   const metas: MetaStatus[] = []
+  const acumulado = guardadoAntesDoMes(entries, inicio)
   let pendenteFixas = 0
   let reservaMeta = 0
 
   for (const c of categories) {
     if (c.tipo === 'fixa') {
       const pago = gastoPorCategoria.get(c.id) ?? 0
-      const pendente = Math.max(0, c.valorPrevisto - pago)
+      // conta de valor variável se fecha no primeiro pagamento do mês: a conta
+      // chegou, foi paga pelo que veio, e reservar a diferença de uma
+      // estimativa seria segurar dinheiro que não vai mais sair
+      const pendente =
+        c.valorEstimado && pago > 0 ? 0 : Math.max(0, c.valorPrevisto - pago)
       pendenteFixas += pendente
       fixas.push({
         categoryId: c.id,
@@ -278,6 +371,7 @@ export function allocateMonth({
         previsto: c.valorPrevisto,
         pago,
         pendente,
+        estimado: c.valorEstimado,
         diaVencimento: c.diaVencimento,
       })
       continue
@@ -295,18 +389,44 @@ export function allocateMonth({
       continue
     }
 
+    // a meta não tem valor mensal digitado: ele sai do que ainda falta juntar
+    // dividido pelos meses até o prazo, e se refaz todo mês
     const guardadoNaMeta = guardadoPorCategoria.get(c.id) ?? 0
-    const reserva = Math.max(0, c.valorPrevisto - guardadoNaMeta)
+    const guardadoAntes = acumulado.get(c.id) ?? 0
+    const semPlano = c.metaTotal === null || c.dataFinal === null
+    const faltaNoInicio = semPlano ? 0 : Math.max(0, (c.metaTotal ?? 0) - guardadoAntes)
+    const previsto = mensalDaMeta(faltaNoInicio, c.dataFinal, inicio)
+    const reserva = Math.max(0, previsto - guardadoNaMeta)
+    const guardadoTotal = guardadoAntes + guardadoNaMeta
+
     reservaMeta += reserva
     metas.push({
       categoryId: c.id,
       nome: c.nome,
-      previsto: c.valorPrevisto,
+      previsto,
       guardado: guardadoNaMeta,
       reserva,
       metaTotal: c.metaTotal,
+      dataFinal: c.dataFinal,
+      guardadoTotal,
+      faltaTotal: Math.max(0, (c.metaTotal ?? 0) - guardadoTotal),
+      mesesRestantes: mesesAtePrazo(c.dataFinal, inicio),
+      semPlano,
     })
   }
+
+  const cartoes: CardUsage[] = cards.map((c) => {
+    const gasto = gastoPorCartao.get(c.id) ?? 0
+    return {
+      cardId: c.id,
+      nome: c.nome,
+      limite: c.limiteMensal,
+      gasto,
+      // sem teto não há restante nem estouro: o cartão só acompanha o gasto
+      restante: c.limiteMensal > 0 ? c.limiteMensal - gasto : 0,
+      acimaDoLimite: c.limiteMensal > 0 && gasto > c.limiteMensal,
+    }
+  })
 
   const livre =
     settings.saldoInicial +
@@ -338,6 +458,7 @@ export function allocateMonth({
     fixas,
     flexiveis,
     metas,
+    cartoes,
     tetosAcimaDoDisponivel: tetoRestante > livre,
   }
 
@@ -353,4 +474,94 @@ export function allocateMonth({
     diario,
     ritmoDoDia: diario - gastoLivreHoje,
   }
+}
+
+export interface DayProjection {
+  /** YYYY-MM-DD */
+  data: string
+  dia: number
+  isToday: boolean
+  /** dia já vencido: mostra o que aconteceu, não projeção */
+  passado: boolean
+  entradas: Cents
+  saidas: Cents
+  guardado: Cents
+  /** a fatia do diário reservada para este dia; 0 nos dias passados e em déficit */
+  diario: Cents
+  /** o livre projetado no fim do dia; null nos dias que já passaram */
+  saldo: Cents | null
+  occurrences: Occurrence[]
+}
+
+export interface MonthProjection {
+  alloc: Allocation
+  dias: DayProjection[]
+}
+
+/**
+ * O mês dia a dia, em cima da mesma conta de `allocateMonth` — a tabela de
+ * saldos não tem projeção própria.
+ *
+ * O saldo de cada dia é o `livre` queimando o diário: reserva-se `diario` por
+ * dia contado, de hoje até o fim do mês. Como `diario` é o piso de
+ * `livre / diasRestantes`, o último dia fecha no troco da divisão — em mês que
+ * fecha a conta a projeção não vai para o vermelho. Em déficit não existe
+ * diário: o livre fica parado no negativo até entrar mais dinheiro, e todo dia
+ * que falta nasce vermelho.
+ *
+ * Lançamento com data futura já entrou em `livre` (o motor só olha o calendário
+ * para receber, não para gastar), então ele aparece na linha do dia sem
+ * descontar de novo.
+ */
+export function projectMonth(args: AllocateMonthArgs): MonthProjection {
+  const { entries, month, today } = args
+  const alloc = allocateMonth(args)
+
+  const inicio = startOfMonth(month)
+  const hoje = toISO(today)
+
+  const porDia = new Map<string, Occurrence[]>()
+  for (const o of expandEntries(entries, inicio, endOfMonth(month))) {
+    const doDia = porDia.get(o.data)
+    if (doDia) doDia.push(o)
+    else porDia.set(o.data, [o])
+  }
+
+  const diario = alloc.status === 'ok' ? alloc.diario : 0
+  let saldo = alloc.livre
+  const dias: DayProjection[] = []
+
+  for (let d = 1; d <= getDaysInMonth(month); d++) {
+    const data = toISO(addDays(inicio, d - 1))
+    const occurrences = porDia.get(data) ?? []
+
+    let entradas = 0
+    let saidas = 0
+    let guardado = 0
+    for (const o of occurrences) {
+      if (o.tipo === 'entrada') entradas += o.valor
+      else if (o.tipo === 'guardado') guardado += o.valor
+      else saidas += o.valor
+    }
+
+    // os dias de hoje em diante são exatamente os que formam `diasRestantes`:
+    // num mês passado nenhum conta, num mês futuro todos contam
+    const contado = data >= hoje
+    if (contado) saldo -= diario
+
+    dias.push({
+      data,
+      dia: d,
+      isToday: data === hoje,
+      passado: !contado,
+      entradas,
+      saidas,
+      guardado,
+      diario: contado ? diario : 0,
+      saldo: contado ? saldo : null,
+      occurrences,
+    })
+  }
+
+  return { alloc, dias }
 }

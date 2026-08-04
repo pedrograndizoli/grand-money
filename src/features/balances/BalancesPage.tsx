@@ -1,292 +1,234 @@
-import { useMemo } from 'react'
-import { TriangleAlert } from 'lucide-react'
-import { formatBRL } from '../../domain/money'
-import { allocateMonth } from '../../domain/projection'
-import type {
-  Allocation,
-  FixedStatus,
-  FlexAllocation,
-  MetaStatus,
-} from '../../domain/projection'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { formatBRL, formatCents } from '../../domain/money'
+import { projectMonth } from '../../domain/projection'
+import type { Allocation, DayProjection, MonthProjection } from '../../domain/projection'
 import { useCategories } from '../../hooks/useCategories'
+import { useCards } from '../../hooks/useCards'
 import { useEntries } from '../../hooks/useEntries'
 import { useSettings } from '../../hooks/useSettings'
 import { useMonth } from '../../store/useMonth'
 import { MonthStepper } from '../../components/layout/MonthStepper'
 import { cn } from '../../lib/cn'
+import { DayEntriesSheet } from './DayEntriesSheet'
+import { LegendButton } from './LegendButton'
+import { TodayBadge } from './TodayBadge'
+
+/** dia · lançamentos · diário · saldo — as quatro colunas ficam alinhadas linha a linha */
+const GRID =
+  'grid grid-cols-[2.5rem_minmax(0,1fr)_6rem_7rem] lg:grid-cols-[4rem_minmax(0,1fr)_9rem_10rem]'
 
 export function BalancesPage() {
-  const { month } = useMonth()
+  const { month, goToToday } = useMonth()
   const settings = useSettings()
   const categories = useCategories()
+  const cards = useCards()
   const entries = useEntries()
 
   const today = useMemo(() => new Date(), [])
+  const [diaAberto, setDiaAberto] = useState<string | null>(null)
 
-  const alloc = useMemo<Allocation | null>(() => {
+  const proj = useMemo<MonthProjection | null>(() => {
     if (!settings.data) return null
-    return allocateMonth({
+    return projectMonth({
       settings: settings.data,
       categories: categories.data ?? [],
+      cards: cards.data ?? [],
       entries: entries.data ?? [],
       month,
       today,
     })
-  }, [settings.data, categories.data, entries.data, month, today])
+  }, [settings.data, categories.data, cards.data, entries.data, month, today])
+
+  const scroller = useRef<HTMLDivElement>(null)
+  const linhaDeHoje = useRef<HTMLDivElement>(null)
+  const pronto = proj !== null
+
+  // abrir no dia de hoje; nos outros meses, começar do dia 1
+  useEffect(() => {
+    if (linhaDeHoje.current) linhaDeHoje.current.scrollIntoView({ block: 'center' })
+    else scroller.current?.scrollTo({ top: 0 })
+  }, [month, pronto])
+
+  const doDiaAberto =
+    proj?.dias.find((d) => d.data === diaAberto)?.occurrences ?? []
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <header className="flex shrink-0 items-center border-b border-ink-300/70 px-4 py-3 lg:px-6">
+      <header className="flex shrink-0 items-center gap-2 border-b border-ink-300/70 px-3 py-3 pr-14 lg:px-6 lg:pr-16">
+        <TodayBadge day={today.getDate()} onClick={goToToday} />
         <MonthStepper />
+        <LegendButton />
       </header>
 
-      <div className="min-h-0 flex-1 overflow-y-auto">
-        {!alloc ? null : (
+      {proj && <Resumo alloc={proj.alloc} />}
+
+      <div ref={scroller} className="min-h-0 flex-1 overflow-y-auto">
+        {proj && (
           <>
-            <Hero alloc={alloc} />
+            <div
+              className={cn(
+                GRID,
+                'sticky top-0 z-10 border-b border-ink-300/70 bg-surface text-xs text-ink-600 lowercase',
+              )}
+            >
+              <span className="py-2 text-center">dia</span>
+              <span className="py-2 pl-2">lançamentos</span>
+              <span className="py-2 pr-1 text-right">diário</span>
+              <span className="py-2 pr-3 text-right">saldo</span>
+            </div>
 
-            {alloc.tetosAcimaDoDisponivel && (
-              <div className="flex items-start gap-3 border-b border-ink-300/70 bg-negative/60 px-5 py-4 lg:px-8">
-                <TriangleAlert
-                  className="mt-0.5 size-5 shrink-0"
-                  strokeWidth={2}
-                  aria-hidden
-                />
-                <p className="text-base leading-snug lowercase">
-                  seus tetos flexíveis somam mais do que sobrou. alguma categoria
-                  vai ter que ceder.
-                </p>
-              </div>
-            )}
+            {proj.dias.map((d) => (
+              <DayRow
+                key={d.data}
+                dia={d}
+                ref={d.isToday ? linhaDeHoje : undefined}
+                onOpen={() => setDiaAberto(d.data)}
+              />
+            ))}
 
-            <Section title="o mês até aqui">
-              <Line label="recebido" value={alloc.recebido} />
-              <Line label="gasto livre" value={alloc.gastoLivre} negativo />
-              <Line label="pago em contas fixas" value={alloc.pagoFixas} negativo />
-              <Line label="guardado" value={alloc.guardado} negativo />
-            </Section>
-
-            <Section title="comprometido">
-              <Line label="contas fixas a pagar" value={alloc.pendenteFixas} negativo />
-              <Line label="ainda a guardar" value={alloc.reservaMeta} negativo />
-              <Line label="livre" value={alloc.livre} forte />
-            </Section>
-
-            {alloc.fixas.length > 0 && (
-              <Section title="contas fixas">
-                {alloc.fixas.map((f) => (
-                  <FixedRow key={f.categoryId} fixa={f} />
-                ))}
-              </Section>
-            )}
-
-            {alloc.flexiveis.length > 0 && (
-              <Section title="tetos flexíveis">
-                {alloc.flexiveis.map((f) => (
-                  <FlexRow key={f.categoryId} flex={f} />
-                ))}
-              </Section>
-            )}
-
-            {alloc.metas.length > 0 && (
-              <Section title="metas">
-                {alloc.metas.map((m) => (
-                  <MetaRow key={m.categoryId} meta={m} />
-                ))}
-              </Section>
-            )}
-
-            {categories.data?.length === 0 && (
-              <p className="px-5 py-8 text-base leading-snug text-ink-600 lowercase lg:px-8">
-                você ainda não tem categorias. sem elas, toda saída conta como
-                gasto livre.
-              </p>
-            )}
-
-            <div className="h-8" />
+            <div className="h-6" />
           </>
         )}
       </div>
+
+      <DayEntriesSheet
+        date={diaAberto}
+        occurrences={doDiaAberto}
+        onClose={() => setDiaAberto(null)}
+      />
     </div>
   )
 }
 
-function Hero({ alloc }: { alloc: Allocation }) {
+/** O cabeçalho da tabela: de onde saem os números de cada linha. */
+function Resumo({ alloc }: { alloc: Allocation }) {
+  if (alloc.diasRestantes === 0) {
+    return (
+      <p className="shrink-0 border-b border-ink-300/70 px-4 py-3 text-sm text-ink-600 lowercase lg:px-6">
+        mês encerrado · recebido{' '}
+        <span className="num">{formatBRL(alloc.recebido)}</span> · gasto livre{' '}
+        <span className="num">{formatBRL(alloc.gastoLivre)}</span>
+      </p>
+    )
+  }
+
   if (alloc.status === 'deficit') {
     return (
-      <section className="border-b border-ink-300/70 bg-negative/50 px-5 py-7 lg:px-8">
-        <p className="text-sm text-ink-600 lowercase">falta entrar</p>
-        <p className="num mt-1 text-5xl font-bold tracking-tight">
-          {formatBRL(alloc.falta)}
-        </p>
-        <p className="mt-3 text-base leading-snug text-ink-900/70 lowercase">
-          seus compromissos do mês passam do que entrou até agora. ainda não há
-          diário — assim que cair mais entrada, ele aparece.
-        </p>
-      </section>
+      <p className="shrink-0 border-b border-ink-300/70 bg-negative/50 px-4 py-3 text-sm lowercase lg:px-6">
+        falta entrar{' '}
+        <span className="num font-bold">{formatBRL(alloc.falta)}</span> — sem
+        diário enquanto os compromissos passam do que entrou
+      </p>
     )
   }
 
   return (
-    <section className="border-b border-ink-300/70 bg-positive/60 px-5 py-7 lg:px-8">
-      <p className="text-sm text-ink-600 lowercase">seu diário</p>
-      <p className="num mt-1 text-5xl font-bold tracking-tight">
-        {formatBRL(alloc.diario)}
-      </p>
-      <p className="mt-2 text-base text-ink-600 lowercase">
-        {formatBRL(alloc.livre)} livres para {alloc.diasRestantes}{' '}
-        {alloc.diasRestantes === 1 ? 'dia' : 'dias'}
-      </p>
+    <p className="shrink-0 border-b border-ink-300/70 px-4 py-3 text-sm text-ink-600 lowercase lg:px-6">
+      diário de{' '}
+      <span className="num font-bold text-ink-900">{formatBRL(alloc.diario)}</span> ·{' '}
+      <span className="num">{formatBRL(alloc.livre)}</span> livres para{' '}
+      {alloc.diasRestantes} {alloc.diasRestantes === 1 ? 'dia' : 'dias'}
+    </p>
+  )
+}
 
-      <p className="mt-4 border-t border-ink-900/10 pt-4 text-base lowercase">
-        hoje você já gastou{' '}
-        <span className="num font-medium">{formatBRL(alloc.gastoLivreHoje)}</span>
-        {' · '}
+function DayRow({
+  dia,
+  ref,
+  onOpen,
+}: {
+  dia: DayProjection
+  ref?: React.Ref<HTMLDivElement>
+  onOpen: () => void
+}) {
+  const temLancamento = dia.occurrences.length > 0
+
+  const celulas = (
+    <>
+      <span className="flex items-center justify-center py-3">
         <span
           className={cn(
-            'num font-medium',
-            alloc.ritmoDoDia < 0 ? 'text-accent-600' : 'text-ink-900',
+            'num grid size-7 place-items-center rounded-md text-sm',
+            dia.isToday && 'bg-solid font-bold text-on-solid',
+            !dia.isToday && dia.passado && 'text-ink-600',
           )}
         >
-          {alloc.ritmoDoDia < 0 ? 'passou de' : 'dentro do ritmo por'}{' '}
-          {formatBRL(Math.abs(alloc.ritmoDoDia))}
+          {dia.dia}
         </span>
-      </p>
-    </section>
-  )
-}
+      </span>
 
-function Section({
-  title,
-  children,
-}: {
-  title: string
-  children: React.ReactNode
-}) {
-  return (
-    <section>
-      <h2 className="px-5 pt-7 pb-2 text-sm text-ink-600 lowercase lg:px-8">
-        {title}
-      </h2>
-      {children}
-    </section>
-  )
-}
+      <span className="flex min-w-0 flex-col justify-center gap-0.5 py-2 pl-2 text-xs">
+        {dia.entradas > 0 && (
+          <span className="num truncate text-income-600">
+            +{formatCents(dia.entradas)}
+          </span>
+        )}
+        {dia.saidas > 0 && (
+          <span className="num truncate text-accent-600">
+            −{formatCents(dia.saidas)}
+          </span>
+        )}
+        {dia.guardado > 0 && (
+          <span className="num truncate text-badge">
+            −{formatCents(dia.guardado)}
+          </span>
+        )}
+      </span>
 
-function Line({
-  label,
-  value,
-  negativo,
-  forte,
-}: {
-  label: string
-  value: number
-  negativo?: boolean
-  forte?: boolean
-}) {
-  return (
-    <div className="flex items-center justify-between gap-4 border-b border-ink-300/50 px-5 py-3.5 lg:px-8">
-      <span className="text-base lowercase">{label}</span>
+      <span className="flex items-center justify-end gap-1.5 py-3 pr-1">
+        {dia.diario > 0 ? (
+          <>
+            <span
+              aria-hidden
+              className="grid size-4 shrink-0 place-items-center rounded-full bg-badge text-[9px] leading-none font-bold text-white"
+            >
+              D
+            </span>
+            <span className="num text-[13px]">{formatBRL(dia.diario)}</span>
+          </>
+        ) : (
+          <span className="text-ink-300">—</span>
+        )}
+      </span>
+
       <span
         className={cn(
-          'num text-base font-medium',
-          forte && 'text-lg font-bold',
-          value !== 0 && negativo && 'text-accent-600',
-          value < 0 && 'text-accent-600',
+          'flex items-center justify-end py-3 pr-3',
+          dia.saldo !== null && (dia.saldo < 0 ? 'bg-negative' : 'bg-positive'),
         )}
       >
-        {negativo && value > 0 ? '−' : ''}
-        {formatBRL(value)}
+        {dia.saldo === null ? (
+          <span className="text-ink-300">—</span>
+        ) : (
+          <span className="num text-[13px] font-medium">
+            {formatBRL(dia.saldo)}
+          </span>
+        )}
       </span>
-    </div>
+    </>
   )
-}
 
-function FixedRow({ fixa }: { fixa: FixedStatus }) {
-  const quitada = fixa.pendente === 0
-  return (
-    <div className="border-b border-ink-300/50 px-5 py-3.5 lg:px-8">
-      <div className="flex items-baseline justify-between gap-4">
-        <span className="truncate text-base font-medium lowercase">
-          {fixa.nome}
-          {fixa.diaVencimento && (
-            <span className="ml-2 text-sm font-normal text-ink-600">
-              vence dia {fixa.diaVencimento}
-            </span>
-          )}
-        </span>
-        <span
-          className={cn(
-            'num shrink-0 text-base font-medium',
-            quitada ? 'text-income-600' : 'text-ink-900',
-          )}
-        >
-          {quitada ? 'paga' : formatBRL(fixa.pendente)}
-        </span>
+  if (!temLancamento) {
+    return (
+      <div ref={ref} className={cn(GRID, 'border-b border-ink-300/50')}>
+        {celulas}
       </div>
-      {!quitada && fixa.pago > 0 && (
-        <p className="num mt-1 text-sm text-ink-600">
-          {formatBRL(fixa.pago)} de {formatBRL(fixa.previsto)}
-        </p>
-      )}
-    </div>
-  )
-}
-
-function FlexRow({ flex }: { flex: FlexAllocation }) {
-  const estourou = flex.restante < 0
-  const usado = flex.alocado > 0 ? Math.min(1, flex.gasto / flex.alocado) : 0
+    )
+  }
 
   return (
-    <div className="border-b border-ink-300/50 px-5 py-3.5 lg:px-8">
-      <div className="flex items-baseline justify-between gap-4">
-        <span className="truncate text-base font-medium lowercase">
-          {flex.nome}
-        </span>
-        <span
-          className={cn(
-            'num shrink-0 text-base font-medium',
-            estourou && 'text-accent-600',
-          )}
-        >
-          {estourou ? '−' : ''}
-          {formatBRL(Math.abs(flex.restante))}
-        </span>
-      </div>
-      <div className="mt-2 flex items-center gap-3">
-        <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-ink-300/40">
-          <div
-            className={cn(
-              'h-full rounded-full',
-              estourou ? 'bg-accent-600' : 'bg-accent-500',
-            )}
-            style={{ width: `${usado * 100}%` }}
-          />
-        </div>
-        <span className="num shrink-0 text-xs text-ink-600">
-          {formatBRL(flex.gasto)} / {formatBRL(flex.alocado)}
-        </span>
-      </div>
-    </div>
-  )
-}
-
-function MetaRow({ meta }: { meta: MetaStatus }) {
-  return (
-    <div className="border-b border-ink-300/50 px-5 py-3.5 lg:px-8">
-      <div className="flex items-baseline justify-between gap-4">
-        <span className="truncate text-base font-medium lowercase">
-          {meta.nome}
-        </span>
-        <span className="num shrink-0 text-base font-medium">
-          {formatBRL(meta.guardado)} / {formatBRL(meta.previsto)}
-        </span>
-      </div>
-      {meta.metaTotal !== null && (
-        <p className="num mt-1 text-sm text-ink-600">
-          objetivo {formatBRL(meta.metaTotal)}
-        </p>
-      )}
+    <div ref={ref}>
+      <button
+        type="button"
+        onClick={onOpen}
+        aria-label={`lançamentos do dia ${dia.dia}`}
+        className={cn(
+          GRID,
+          'w-full border-b border-ink-300/50 text-left transition-colors hover:bg-ink-900/4',
+        )}
+      >
+        {celulas}
+      </button>
     </div>
   )
 }

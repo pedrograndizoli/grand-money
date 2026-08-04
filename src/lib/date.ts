@@ -7,6 +7,11 @@ export function monthLabel(date: Date): string {
   return `${mes}/${format(date, 'yy')}`
 }
 
+/** "terça-feira, 4 de agosto" */
+export function dayLabel(date: Date): string {
+  return format(date, "EEEE, d 'de' MMMM", { locale: ptBR }).toLowerCase()
+}
+
 /** "3/8/2026" */
 export function shortDate(date: Date): string {
   return format(date, 'd/M/yyyy')

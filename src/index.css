@@ -6,7 +6,15 @@
   --color-brand-300: #f7a3c4;
   --color-brand-100: #fdeef4;
 
-  /* preto/cinza — texto e botões primários */
+  /* fundo da página e das superfícies levantadas (sheets, cards) */
+  --color-surface: #ffffff;
+  --color-surface-2: #ffffff;
+
+  /* o par do botão preto — vira claro no dark, com texto escuro */
+  --color-solid: #1b1b1b;
+  --color-on-solid: #ffffff;
+
+  /* preto/cinza — texto e linhas */
   --color-ink-900: #1b1b1b;
   --color-ink-600: #6b6b6b;
   --color-ink-300: #d9d9d9;
@@ -14,10 +22,16 @@
   /* laranja — saídas e tab ativa */
   --color-accent-600: #cf420f;
   --color-accent-500: #e8531f;
+  --color-accent-100: #fce8e0;
 
   /* verde — entradas, o contraponto do laranja */
   --color-income-600: #0f7a4d;
   --color-income-500: #129160;
+  --color-income-100: #dff2e8;
+
+  /* fundos suaves dos selos de status — a cor forte fica no texto */
+  --color-badge-100: #fce0ec;
+  --color-ink-100: #eeeeee;
 
   /* projeção de saldo */
   --color-positive: #fbe5a0;
@@ -39,6 +53,73 @@
   --animate-pop-in: pop-in 0.18s var(--ease-out-soft);
   --animate-slide-in: slide-in 0.22s var(--ease-out-soft);
   --animate-caret: caret 1.1s step-end infinite;
+}
+
+/**
+ * Dark: só redefine os valores dos tokens. Toda utility construída em cima
+ * deles (`text-ink-900`, `border-ink-300/70`, `bg-ink-900/4`) vira sozinha —
+ * por isso o app inteiro não precisou de uma classe `dark:` sequer. O que
+ * precisa de mão é só o que foi escrito como cor literal.
+ *
+ * `.tema-claro` desfaz o dark num pedaço da árvore: as telas de marca (fundo
+ * pink com texto escuro) não invertem, elas são a cor da marca.
+ */
+:root.dark {
+  color-scheme: dark;
+
+  --color-surface: #121212;
+  --color-surface-2: #1c1c1c;
+
+  --color-solid: #f0efed;
+  --color-on-solid: #121212;
+
+  --color-ink-900: #f0efed;
+  --color-ink-600: #9a9a9a;
+  --color-ink-300: #333333;
+  --color-ink-100: #262626;
+
+  /* os fundos de célula e de selo escurecem para o texto claro caber neles */
+  --color-positive: #4a3d18;
+  --color-negative: #4f2429;
+  --color-accent-100: #3d1c0e;
+  --color-income-100: #12301f;
+  --color-badge-100: #3d1024;
+}
+
+:root.dark .tema-claro {
+  color-scheme: light;
+
+  --color-surface: #ffffff;
+  --color-surface-2: #ffffff;
+  --color-solid: #1b1b1b;
+  --color-on-solid: #ffffff;
+  --color-ink-900: #1b1b1b;
+  --color-ink-600: #6b6b6b;
+  --color-ink-300: #d9d9d9;
+  --color-ink-100: #eeeeee;
+  --color-positive: #fbe5a0;
+  --color-negative: #f8c9cd;
+  --color-accent-100: #fce8e0;
+  --color-income-100: #dff2e8;
+  --color-badge-100: #fce0ec;
+}
+
+/**
+ * A troca de tema entra por um círculo que cresce do botão. As duas camadas
+ * ficam paradas: quem anima é o `clip-path` da nova, aplicado no clique.
+ */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+
+::view-transition-old(root) {
+  z-index: 1;
+}
+
+::view-transition-new(root) {
+  z-index: 2;
 }
 
 @keyframes fade-in {
@@ -82,7 +163,7 @@
   }
 
   body {
-    @apply bg-white font-display text-ink-900 antialiased;
+    @apply bg-surface font-display text-ink-900 antialiased;
     /* o app é uma coluna fixa: quem rola é a tabela, não a página */
     overscroll-behavior-y: none;
   }

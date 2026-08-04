@@ -13,6 +13,7 @@ export const queryClient = new QueryClient({
 export const queryKeys = {
   settings: ['settings'] as const,
   categories: ['categories'] as const,
+  cards: ['cards'] as const,
   /**
    * Uma chave só para todos os lançamentos. Chave por mês seria errada:
    * um lançamento mensal criado em janeiro muda a projeção de todo mês

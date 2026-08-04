@@ -23,11 +23,59 @@ Categoria é uma entidade, com três tipos:
 |---|---|---|
 | `fixa` | conta com valor previsto e vencimento (aluguel, energia) | `valor_previsto`, `dia_vencimento` |
 | `flexivel` | teto mensal de gasto livre (mercado, lazer) | `valor_previsto` |
-| `meta` | quanto guardar por mês, com total opcional | `valor_previsto`, `meta_total` |
+| `meta` | um total a juntar até uma data | `meta_total`, `data_final` |
 
 Uma conta fixa é considerada paga **pelos próprios lançamentos**: o pendente dela
 é `valor_previsto − soma das saídas naquela categoria no mês`. Não existe flag
 nem tabela de status de pagamento — não crie.
+
+**Conta fixa de valor variável** (`valor_estimado = true`): energia, água, aquela
+que vem todo mês mas nunca no mesmo valor. O `valor_previsto` dela é só uma
+estimativa para reservar, e **o primeiro pagamento do mês fecha a conta**:
+
+```
+pendente = valor_estimado && pago > 0 ? 0 : max(0, valor_previsto − pago)
+```
+
+Sem isso, pagar R$ 150 de uma estimativa de R$ 200 deixaria R$ 50 reservados para
+sempre, segurando dinheiro que já foi resolvido. Continua sem flag de status — o
+que fecha a conta é existir lançamento nela no mês. Numa conta de valor exato o
+pagamento parcial segue cobrando a diferença, porque ali a diferença é real.
+
+**A meta não tem valor mensal digitado.** O usuário informa quanto quer juntar
+(`meta_total`) e até quando (`data_final`); o mensal é calculado e se refaz a
+cada mês, em cima do que ainda falta:
+
+```
+faltaNoInicioDoMes = max(0, meta_total − guardado em todos os meses anteriores)
+mesesAtePrazo      = meses de (mês visível) até (mês de data_final), inclusive
+mensal             = ceil(faltaNoInicioDoMes / mesesAtePrazo)
+```
+
+Arredonda **para cima**: por baixo, a soma dos meses não fecha a meta. No último
+mês — ou com o prazo vencido — cai tudo o que falta de uma vez, senão a meta
+sumiria da conta justo quando mais aperta. Guardar a mais num mês alivia os
+seguintes; pular um mês dilui o resto nos que sobraram. Meta sem `meta_total` ou
+sem `data_final` não reserva nada.
+
+### Cartões de crédito
+
+Cartão é entidade própria (`cards`), informada **na mão** — não existe open
+banking nem importação de fatura. Tem nome e `limite_mensal`, o teto de gasto do
+mês naquele cartão (`0` = sem teto). Um lançamento de **saída** aponta para um
+cartão em `entries.card_id`; `null` é à vista, débito ou dinheiro. Entrada e
+`guardado` nunca têm cartão.
+
+**O cartão não adia dinheiro.** Uma saída no cartão sai do `livre` no dia em que
+acontece, igual a qualquer outra: não existe fatura, fechamento nem vencimento
+no modelo. Fingir que o dinheiro só sai no mês seguinte aumentaria o diário de
+hoje com dinheiro já comprometido, e isso é exatamente a mentira que o app
+existe para não contar. O cartão é uma **dimensão** do lançamento, ao lado da
+categoria, não um caminho diferente para o dinheiro.
+
+O teto do cartão, como o teto flexível, **avisa e não reserva**: `allocateMonth`
+devolve `cartoes: { limite, gasto, restante, acimaDoLimite }` e a UI mostra a
+barra. Nada disso entra na conta do `livre`.
 
 ### Regra de negócio central
 
@@ -38,8 +86,9 @@ recebido       = soma das entradas do mês até hoje
 gastoLivre     = saídas em categorias flexíveis ou sem categoria
 pagoFixas      = saídas em categorias fixas
 guardado       = lançamentos de tipo `guardado` no mês
-pendenteFixas  = Σ max(0, previsto − pago)     das categorias fixas
-reservaMeta    = Σ max(0, previsto − guardado) das categorias meta
+pendenteFixas  = Σ pendente das categorias fixas  (ver conta de valor variável)
+reservaMeta    = Σ max(0, mensal − guardado)   das categorias meta
+                 (mensal calculado do total e do prazo, ver acima)
 
 livre  = saldoInicial + recebido − gastoLivre − pagoFixas − guardado
                       − pendenteFixas − reservaMeta
@@ -124,9 +173,19 @@ create table categories (
   user_id uuid not null references auth.users on delete cascade,
   nome text not null,
   tipo text not null check (tipo in ('fixa','flexivel','meta')),
-  valor_previsto int not null default 0,  -- fixa: conta · flexivel: teto · meta: por mês
+  valor_previsto int not null default 0,  -- fixa: conta · flexivel: teto · meta: não usa
+  valor_estimado boolean not null default false,  -- só em 'fixa': o valor muda todo mês
   dia_vencimento int,                     -- só em 'fixa'
-  meta_total int,                         -- só em 'meta', opcional
+  meta_total int,                         -- só em 'meta': o total a juntar
+  data_final date,                        -- só em 'meta': o prazo
+  cor text
+);
+
+create table cards (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users on delete cascade,
+  nome text not null,
+  limite_mensal int not null default 0,   -- centavos · 0 = sem teto
   cor text
 );
 
@@ -138,6 +197,7 @@ create table entries (
   descricao text,
   data date not null,
   category_id uuid references categories,  -- null = gasto livre sem categoria
+  card_id uuid references cards on delete set null,  -- null = à vista; só em saída
   recorrencia text not null default 'nenhuma'
     check (recorrencia in ('nenhuma','mensal','semanal','diaria','parcelado')),
   parcelas int,                       -- só quando recorrencia = 'parcelado'
@@ -151,7 +211,7 @@ create index entries_user_data_idx on entries (user_id, data);
 `guardado` não é saída: contá-lo como gasto inflaria os gastos do mês. É dinheiro
 que sai do bolo livre para uma meta.
 
-RLS ligada nas três tabelas. A policy precisa de `using` **e** `with check` — só
+RLS ligada nas quatro tabelas. A policy precisa de `using` **e** `with check` — só
 `using` deixa o INSERT passar pelo SELECT e morrer na escrita com `42501`:
 
 ```sql
@@ -179,19 +239,22 @@ src/
     supabase.ts            client único
     queryClient.ts  cn.ts  date.ts  errors.ts
   repositories/
-    entries.ts  settings.ts  categories.ts
+    entries.ts  settings.ts  categories.ts  cards.ts
   hooks/
-    useEntries.ts  useSettings.ts  useCategories.ts   (TanStack Query)
+    useEntries.ts  useSettings.ts  useCategories.ts  useCards.ts
     useIsTouch.ts
   store/
-    useMonth.ts            mês visível — só isso é estado global de UI
+    useMonth.ts            mês visível
+    useTheme.ts            claro/escuro, persistido no localStorage
   components/
-    ui/                    Button, Sheet, Field, NumericKeypad, MoneyInput...
-    layout/                AppShell, BottomNav, Sidebar, MonthStepper, BrandScreen
+    ui/                    Button, Sheet, Field, NumericKeypad, MoneyInput, StatusPill...
+    layout/                AppShell, BottomNav, Sidebar, MonthStepper, BrandScreen, ThemeToggle
   features/
     auth/                  tela /entrar + RequireAuth
     onboarding/            4 passos: saldo de hoje + categorias iniciais
-    balances/              tela principal — a alocação do mês
+    today/                 `/` — o diário de hoje, metas e cartões
+    balances/              `/saldos` — o mês dia a dia
+    expenses/              `/gastos` — o que já saiu e o que falta sair
     entry-form/            criar/editar/apagar lançamento
     totals/  tags/  menu/
   routes.tsx
@@ -220,6 +283,12 @@ Definir em `index.css` com `@theme`. Nunca hardcodar hex em componente.
   --color-accent-600: #cf420f;
   --color-accent-500: #e8531f;
 
+  /* tints dos selos de status: fundo suave, cor forte no texto */
+  --color-accent-100: #fce8e0;
+  --color-income-100: #dff2e8;
+  --color-badge-100:  #fce0ec;
+  --color-ink-100:    #eeeeee;
+
   /* projeção de saldo */
   --color-positive: #fbe5a0;   /* fundo da célula com saldo >= 0 */
   --color-negative: #f8c9cd;   /* fundo da célula com saldo < 0  */
@@ -246,6 +315,38 @@ personalidade do produto — não "corrija" para sentence case.
 **Raio:** pílula total (`rounded-full`) em botões; `rounded-2xl` em sheets e
 cards; `rounded-none` nas linhas da tabela de saldos.
 
+**Tema escuro.** O `.dark` no `<html>` **só redefine os valores dos tokens** em
+`index.css` — `--color-surface`, `--color-ink-*`, `--color-positive/negative` e
+os tints dos selos. Como toda utility do Tailwind v4 compila para
+`var(--color-…)`, o app inteiro vira sem uma única classe `dark:`. Não escreva
+`dark:` em componente: se algo não virou, é porque foi escrito como cor literal
+(`bg-white`, `bg-ink-900` num fundo sólido) — troque pelo token
+(`bg-surface`, `bg-solid` + `text-on-solid`).
+
+Duas exceções por desenho: o formulário de lançamento e os sheets `tone="dark"`
+são escuros sempre (`surface-dark`, `line-dark`, `white/xx`), e as telas de marca
+(`BrandScreen`, onboarding, `/entrar`) levam a classe **`.tema-claro`**, que
+retrava os tokens no claro — pink da marca com texto escuro é identidade, não
+preferência.
+
+O botão fica no canto superior direito do `AppShell` (`layout/ThemeToggle`), o
+estado em `store/useTheme` (localStorage, com `prefers-color-scheme` como
+padrão), e a troca anima por um círculo que cresce do botão via View Transitions
+API. Sem suporte (Firefox) ou com `prefers-reduced-motion`, troca seca.
+
+**Vocabulário de estado.** Um só, em todas as telas, via `components/ui/StatusPill`:
+
+| estado | selo | onde |
+|---|---|---|
+| pago / paga | verde claro (`income-100` + `income-600`), com ✓ | lançamento já realizado, conta fixa quitada |
+| a pagar · agendado · estimada | laranja claro (`accent-100` + `accent-600`) | conta em aberto, saída com data futura |
+| atrasada · teto estourado | laranja sólido (`accent-600` + branco) | vencimento já passou, teto ultrapassado |
+| neutro | cinza (`ink-100` + `ink-600`) | informação sem urgência, tipo "restam R$ x" |
+
+Só o estado que **exige ação** ganha cor sólida — se tudo grita, nada grita. Na
+lista de gastos a linha ainda leva uma barra de 4px na borda esquerda com a
+mesma cor do selo, para o olho varrer a coluna sem ler.
+
 ---
 
 ## 5. As telas
@@ -258,7 +359,9 @@ parágrafo explicativo em `ink-900/60`. No rodapé, dois botões empilhados:
 ### 5.2 Onboarding (`/onboarding/:step`)
 **Quatro passos**, quatro bolinhas: 1) saldo de hoje · 2) contas fixas ·
 3) tetos flexíveis · 4) meta (opcional, com `pular`). A renda não é estimada
-aqui — ela chega em lançamentos de entrada.
+aqui — ela chega em lançamentos de entrada. No passo 4 o usuário dá o **valor
+total** e o **prazo**, e a tela mostra o mensal que o app calculou — nome, valor
+e prazo são os três obrigatórios ali.
 
 Layout comum: seta voltar + bolinhas de progresso no topo, pergunta em display
 grande, botão preto no rodapé. O texto de cada passo fica em
@@ -287,10 +390,27 @@ Tema claro, `‹ ago/26 ›` no topo. De cima para baixo:
 2. **Aviso** quando `tetosAcimaDoDisponivel`.
 3. **o mês até aqui:** recebido · gasto livre · pago em fixas · guardado.
 4. **comprometido:** fixas a pagar · ainda a guardar · **livre**.
-5. **Blocos por tipo de categoria:** contas fixas (com vencimento e pendente),
-   tetos flexíveis (com barra de uso), metas (guardado / previsto).
-6. **Nav inferior (mobile):** saldos · totais · **+** (FAB preto) · tags · menu.
-   Item ativo em `accent-500` com barra no topo.
+5. **Blocos por tipo de categoria:** contas fixas (vencimento, selo de estado e
+   pendente), tetos flexíveis (barra de uso), metas (guardado / previsto) e
+   cartões (gasto / teto). Toda linha abre um sheet de edição, e cada bloco
+   termina no botão de criar — **é daqui que saem** conta fixa, teto e cartão,
+   fora do onboarding. Conta fixa e teto usam `today/CategorySheet`, cartão usa
+   `CardSheet`, meta usa `MetaSheet` (campos diferentes: total e prazo).
+6. **Nav inferior (mobile):** hoje · saldos · **+** (FAB preto) · gastos ·
+   totais · menu. Item ativo em `accent-500` com barra no topo. Cinco itens é o
+   teto: o FAB ocupa uma coluna e não cabe em coluna mais estreita, então uma
+   tela nova no rodapé empurra outra para o menu.
+
+### 5.5 Gastos do mês (`/gastos`)
+Lista das saídas do mês visível em duas seções: **a pagar** (contas fixas com
+pendente, ordenadas por vencimento e marcadas quando atrasam, mais as saídas com
+data futura dentro do mês) e **pago** (saídas com data até hoje, mais recentes
+primeiro). No topo, `pago` e `a pagar` em números.
+
+Nada aqui é status gravado — **não crie flag de pagamento**. "Pago" é o
+lançamento existir com data até hoje; "a pagar" é `valor_previsto − pago` da
+categoria fixa. Tocar numa linha de lançamento abre a edição dele.
+`guardado` não aparece: não é gasto.
 
 > Esta tela é provisória. A visão dia a dia (tabela com selo `D`, saldo por dia,
 > cores por linha) saiu do modelo — os componentes dela seguem em
@@ -299,8 +419,9 @@ Tema claro, `‹ ago/26 ›` no topo. De cima para baixo:
 
 ### 5.4 Lançamento (`/lancamento/novo` e `/lancamento/:id`)
 Tema **escuro**, contrastando com o resto do app. Valor grande no topo, depois
-linhas separadas por hairline: tipo, categoria, descrição, data, repetição, tags.
-Botão laranja no rodapé. Teclado numérico embaixo (touch).
+linhas separadas por hairline: tipo, categoria, cartão, descrição, data,
+repetição, tags. Botão laranja no rodapé. Teclado numérico embaixo (touch).
+A linha de cartão só aparece em `saída`, e `à vista` é o padrão.
 
 Três tipos, cada um com ícone circular próprio: `saída` (laranja), `entrada`
 (verde), `guardado` (`--color-badge`). A categoria oferecida segue o tipo —
@@ -336,8 +457,9 @@ largura de tela.
 
 ## 7. Regras para você, Claude
 
-- **Não invente escopo.** Construa a tela pedida e pare. Nada de settings, dark
-  mode toggle, gráficos ou export que não foram pedidos.
+- **Não invente escopo.** Construa a tela pedida e pare. Nada de settings,
+  gráficos ou export que não foram pedidos. (O tema escuro **foi** pedido e
+  existe — ver seção 4.)
 - **Leia só o necessário.** Se eu não citar um arquivo com `@`, não vasculhe o
   projeto atrás dele.
 - Componentes de `components/ui/` são criados **uma vez** e reusados. Antes de

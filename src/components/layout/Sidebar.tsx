@@ -9,7 +9,7 @@ export function Sidebar() {
   const navigate = useNavigate()
 
   return (
-    <aside className="hidden w-60 shrink-0 flex-col border-r border-ink-300/70 bg-white px-5 py-7 lg:flex">
+    <aside className="hidden w-60 shrink-0 flex-col border-r border-ink-300/70 bg-surface px-5 py-7 lg:flex">
       <p className="px-2 text-sm font-semibold tracking-[0.18em] text-ink-600 uppercase">
         {APP.name}
       </p>

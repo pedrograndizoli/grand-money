@@ -13,6 +13,9 @@ interface BrandScreenProps {
 /**
  * Fundo pink de ponta a ponta no celular; no desktop vira um cartão branco
  * centralizado sobre o mesmo pink.
+ *
+ * `tema-claro` trava os tokens no claro: o pink da marca com texto escuro é a
+ * identidade destas telas, não muda com o tema do usuário.
  */
 export function BrandScreen({
   header,
@@ -22,7 +25,7 @@ export function BrandScreen({
   className,
 }: BrandScreenProps) {
   return (
-    <div className="bg-brand-500 lg:grid lg:min-h-svh lg:place-items-center lg:p-8">
+    <div className="tema-claro bg-brand-500 text-ink-900 lg:grid lg:min-h-svh lg:place-items-center lg:p-8">
       <div
         className={cn(
           'flex h-svh flex-col overflow-hidden',

@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
-import { ArrowDownLeft, ArrowUpRight, ChevronRight } from 'lucide-react'
+import { ArrowDownLeft, ArrowUpRight, ChevronRight, Wallet } from 'lucide-react'
 import { Sheet } from '../../components/ui/Sheet'
 import { formatBRL } from '../../domain/money'
 import { fromISO } from '../../domain/projection'
@@ -31,7 +31,7 @@ export function DayEntriesSheet({
     <Sheet open={date !== null} onClose={onClose} title={titulo}>
       <ul>
         {occurrences.map((o, i) => {
-          const saida = o.tipo === 'saida'
+          const entrada = o.tipo === 'entrada'
           const detalhe = o.parcela
             ? `parcela ${o.parcela.atual} de ${o.parcela.total}`
             : o.recorrencia !== 'nenhuma'
@@ -48,14 +48,20 @@ export function DayEntriesSheet({
                 <span
                   className={cn(
                     'grid size-8 shrink-0 place-items-center rounded-full text-white',
-                    saida ? 'bg-accent-600' : 'bg-income-600',
+                    o.tipo === 'saida' && 'bg-accent-600',
+                    o.tipo === 'entrada' && 'bg-income-600',
+                    o.tipo === 'guardado' && 'bg-badge',
                   )}
                   aria-hidden
                 >
-                  {saida ? (
+                  {o.tipo === 'saida' && (
                     <ArrowUpRight className="size-4" strokeWidth={3} />
-                  ) : (
+                  )}
+                  {o.tipo === 'entrada' && (
                     <ArrowDownLeft className="size-4" strokeWidth={3} />
+                  )}
+                  {o.tipo === 'guardado' && (
+                    <Wallet className="size-4" strokeWidth={2.5} />
                   )}
                 </span>
 
@@ -73,10 +79,12 @@ export function DayEntriesSheet({
                 <span
                   className={cn(
                     'num shrink-0 text-base font-medium',
-                    saida ? 'text-accent-600' : 'text-income-600',
+                    o.tipo === 'saida' && 'text-accent-600',
+                    o.tipo === 'entrada' && 'text-income-600',
+                    o.tipo === 'guardado' && 'text-badge',
                   )}
                 >
-                  {saida ? '−' : '+'}
+                  {entrada ? '+' : '−'}
                   {formatBRL(o.valor)}
                 </span>
 

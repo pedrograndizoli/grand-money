@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import { ChevronRight, LogOut, Sigma, Wallet } from 'lucide-react'
+import { ChevronRight, LogOut, Sigma, Tag, Wallet } from 'lucide-react'
 import { fromISO } from '../../domain/projection'
 import { useCategories } from '../../hooks/useCategories'
 import { useSettings } from '../../hooks/useSettings'
@@ -33,6 +33,11 @@ export function MenuPage() {
           label="categorias"
           value={categories ? `${categories.length}` : undefined}
           onClick={() => navigate('/')}
+        />
+        <Item
+          icon={<Tag className="size-5" strokeWidth={2} />}
+          label="gasto por tag"
+          onClick={() => navigate('/tags')}
         />
         <Item
           icon={<Wallet className="size-5" strokeWidth={2} />}

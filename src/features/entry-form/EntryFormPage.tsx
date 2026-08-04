@@ -1,10 +1,11 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Navigate, useNavigate, useParams } from 'react-router-dom'
 import {
   ArrowDownLeft,
   ArrowUpRight,
   Calendar,
   CalendarSync,
+  CreditCard,
   Pencil,
   Tag,
   Trash2,
@@ -25,13 +26,21 @@ import {
   useUpdateEntry,
 } from '../../hooks/useEntries'
 import { useCategories } from '../../hooks/useCategories'
+import { useCards } from '../../hooks/useCards'
 import { todayISO } from '../../lib/date'
 import { cn } from '../../lib/cn'
 import { errorMessage } from '../../lib/errors'
 import { RECURRENCES, recurrenceLabel } from './recurrence'
 import { TagsSheet } from './TagsSheet'
 
-type OpenSheet = 'tipo' | 'categoria' | 'repeticao' | 'tags' | 'apagar' | null
+type OpenSheet =
+  | 'tipo'
+  | 'categoria'
+  | 'cartao'
+  | 'repeticao'
+  | 'tags'
+  | 'apagar'
+  | null
 
 const TIPOS: ReadonlyArray<{
   value: EntryType
@@ -55,7 +64,7 @@ export function EntryFormPage() {
   if (!id) return <EntryForm />
 
   if (entries.isPending) {
-    return <div className="h-svh bg-surface-dark" />
+    return <div className="h-svh bg-surface-dark lg:bg-black/55" />
   }
 
   const entry = entries.data?.find((e) => e.id === id)
@@ -85,10 +94,13 @@ function EntryForm({ entry }: { entry?: Entry }) {
   const [categoryId, setCategoryId] = useState<string | null>(
     entry?.categoryId ?? null,
   )
+  const [cardId, setCardId] = useState<string | null>(entry?.cardId ?? null)
   const [sheet, setSheet] = useState<OpenSheet>(null)
   const dateInput = useRef<HTMLInputElement>(null)
 
   const categories = useCategories()
+  const cards = useCards()
+  const cartaoAtual = (cards.data ?? []).find((c) => c.id === cardId) ?? null
 
   // guardado só faz sentido em meta; saída, em fixa ou flexível
   const disponiveis = (categories.data ?? []).filter((c) =>
@@ -100,6 +112,8 @@ function EntryForm({ entry }: { entry?: Entry }) {
     setTipo(novo)
     // uma categoria de meta não sobrevive a virar saída, e vice-versa
     setCategoryId(null)
+    // e só saída passa em cartão
+    if (novo !== 'saida') setCardId(null)
     setSheet(null)
   }
 
@@ -113,6 +127,17 @@ function EntryForm({ entry }: { entry?: Entry }) {
       el.focus() // navegador sem showPicker: dá pra digitar a data
     }
   }
+
+  // no desktop isto é um modal: esc fecha, igual ao clique no escurecido. com
+  // um sheet aberto o esc é dele — fechar os dois de uma vez jogaria fora o
+  // formulário inteiro sem querer
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && sheet === null) navigate(-1)
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [sheet, navigate])
 
   const sugestoes = useMemo(() => {
     const all = (entries.data ?? []).flatMap((e) => e.tags)
@@ -132,6 +157,7 @@ function EntryForm({ entry }: { entry?: Entry }) {
       data,
       // entrada não tem categoria: o que entrou é só "recebido"
       categoryId: tipo === 'entrada' ? null : categoryId,
+      cardId: tipo === 'saida' ? cardId : null,
       recorrencia,
       parcelas: recorrencia === 'parcelado' ? parcelas : null,
       tags,
@@ -159,215 +185,248 @@ function EntryForm({ entry }: { entry?: Entry }) {
   }
 
   return (
-    <div className="flex h-svh flex-col bg-surface-dark text-white [color-scheme:dark]">
-      <header className="flex shrink-0 items-center justify-between px-3 pt-3">
-        <button
-          type="button"
-          onClick={() => navigate(-1)}
-          aria-label="cancelar"
-          className="grid size-10 place-items-center rounded-full text-white/60 transition-colors hover:bg-white/10 hover:text-white"
-        >
-          <X className="size-6" strokeWidth={2.25} />
-        </button>
+    /* mobile: tela inteira. desktop: modal centralizado sobre o escurecido, na
+       mesma medida dos sheets */
+    <div
+      className={cn(
+        'relative flex h-svh flex-col bg-surface-dark text-white [color-scheme:dark]',
+        'lg:items-center lg:justify-center lg:bg-black/55 lg:p-6',
+      )}
+    >
+      <button
+        type="button"
+        aria-label="fechar"
+        onClick={() => navigate(-1)}
+        className="absolute inset-0 hidden lg:block"
+      />
 
-        {editando && (
+      <div
+        className={cn(
+          'relative flex min-h-0 w-full flex-1 flex-col',
+          'lg:h-auto lg:max-h-full lg:max-w-md lg:flex-none lg:overflow-hidden',
+          'lg:rounded-2xl lg:bg-surface-dark lg:shadow-2xl lg:shadow-black/40',
+        )}
+      >
+        <header className="flex shrink-0 items-center justify-between px-3 pt-3">
           <button
             type="button"
-            onClick={() => setSheet('apagar')}
-            aria-label="apagar lançamento"
-            className="grid size-10 place-items-center rounded-full text-white/60 transition-colors hover:bg-accent-600/25 hover:text-accent-500"
+            onClick={() => navigate(-1)}
+            aria-label="cancelar"
+            className="grid size-10 place-items-center rounded-full text-white/60 transition-colors hover:bg-white/10 hover:text-white"
           >
-            <Trash2 className="size-5" strokeWidth={2} />
+            <X className="size-6" strokeWidth={2.25} />
           </button>
-        )}
-      </header>
 
-      <div className="min-h-0 flex-1 overflow-y-auto">
-        <div className="border-b border-line-dark px-5 pt-2 pb-6">
-          <MoneyInput
-            value={valor}
-            onChange={setValor}
-            label="valor"
-            tone="dark"
-            size="xl"
-            autoFocus
-          />
-        </div>
-
-        <Field
-          tone="dark"
-          icon={
-            <span
-              className={cn(
-                'grid size-7 place-items-center rounded-full text-white',
-                tipo === 'saida' && 'bg-accent-600',
-                tipo === 'entrada' && 'bg-income-600',
-                tipo === 'guardado' && 'bg-badge',
-              )}
+          {editando && (
+            <button
+              type="button"
+              onClick={() => setSheet('apagar')}
+              aria-label="apagar lançamento"
+              className="grid size-10 place-items-center rounded-full text-white/60 transition-colors hover:bg-accent-600/25 hover:text-accent-500"
             >
-              {tipo === 'saida' && (
-                <ArrowUpRight className="size-4" strokeWidth={3} />
-              )}
-              {tipo === 'entrada' && (
-                <ArrowDownLeft className="size-4" strokeWidth={3} />
-              )}
-              {tipo === 'guardado' && (
-                <Wallet className="size-4" strokeWidth={2.5} />
-              )}
-            </span>
-          }
-          label={TIPOS.find((t) => t.value === tipo)!.label}
-          chevron
-          onClick={() => setSheet('tipo')}
-        />
+              <Trash2 className="size-5" strokeWidth={2} />
+            </button>
+          )}
+        </header>
 
-        {tipo !== 'entrada' && (
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          <div className="border-b border-line-dark px-5 pt-2 pb-6">
+            <MoneyInput
+              value={valor}
+              onChange={setValor}
+              label="valor"
+              tone="dark"
+              size="xl"
+              autoFocus
+            />
+          </div>
+
+          <Field
+            tone="dark"
+            icon={
+              <span
+                className={cn(
+                  'grid size-7 place-items-center rounded-full text-white',
+                  tipo === 'saida' && 'bg-accent-600',
+                  tipo === 'entrada' && 'bg-income-600',
+                  tipo === 'guardado' && 'bg-badge',
+                )}
+              >
+                {tipo === 'saida' && (
+                  <ArrowUpRight className="size-4" strokeWidth={3} />
+                )}
+                {tipo === 'entrada' && (
+                  <ArrowDownLeft className="size-4" strokeWidth={3} />
+                )}
+                {tipo === 'guardado' && (
+                  <Wallet className="size-4" strokeWidth={2.5} />
+                )}
+              </span>
+            }
+            label={TIPOS.find((t) => t.value === tipo)!.label}
+            chevron
+            onClick={() => setSheet('tipo')}
+          />
+
+          {tipo !== 'entrada' && (
+            <Field
+              tone="dark"
+              icon={<Tag className="size-5" strokeWidth={2} />}
+              label={categoriaAtual?.nome ?? 'sem categoria'}
+              muted={!categoriaAtual}
+              chevron
+              onClick={() => setSheet('categoria')}
+            />
+          )}
+
+          {saida && (
+            <Field
+              tone="dark"
+              icon={<CreditCard className="size-5" strokeWidth={2} />}
+              label={cartaoAtual?.nome ?? 'à vista'}
+              muted={!cartaoAtual}
+              chevron
+              onClick={() => setSheet('cartao')}
+            />
+          )}
+
+          <Field
+            tone="dark"
+            icon={<Pencil className="size-5" strokeWidth={2} />}
+            label="descrição"
+            muted={!descricao}
+          >
+            <input
+              value={descricao}
+              onChange={(e) => setDescricao(e.target.value)}
+              placeholder="descrição"
+              aria-label="descrição"
+              autoComplete="off"
+              className="min-w-0 flex-1 bg-transparent text-lg lowercase outline-none placeholder:text-white/35"
+            />
+          </Field>
+
+          {/* o input fica visível de propósito: um date input transparente não
+              abre o calendário no desktop, só o ícone nativo abre */}
+          <div
+            onClick={abrirCalendario}
+            className="flex w-full cursor-pointer items-center gap-4 border-b border-line-dark px-5 py-5 transition-colors hover:bg-white/4"
+          >
+            <span className="grid size-7 shrink-0 place-items-center">
+              <Calendar className="size-5" strokeWidth={2} />
+            </span>
+            <label
+              htmlFor="data-lancamento"
+              className="min-w-0 flex-1 cursor-pointer text-lg font-medium lowercase"
+            >
+              data
+            </label>
+            <input
+              id="data-lancamento"
+              ref={dateInput}
+              type="date"
+              value={data}
+              onChange={(e) => e.target.value && setData(e.target.value)}
+              className="num shrink-0 cursor-pointer bg-transparent text-lg text-white/70 outline-none focus-visible:text-white"
+            />
+          </div>
+
+          <Field
+            tone="dark"
+            icon={<CalendarSync className="size-5" strokeWidth={2} />}
+            label={recurrenceLabel(recorrencia)}
+            muted={recorrencia === 'nenhuma'}
+            chevron
+            onClick={() => setSheet('repeticao')}
+          />
+
+          {recorrencia === 'parcelado' && (
+            <div className="flex items-center gap-4 border-b border-line-dark px-5 py-5">
+              <span className="grid size-7 shrink-0 place-items-center text-white/35">
+                ×
+              </span>
+              <label className="flex-1 text-lg lowercase" htmlFor="parcelas">
+                parcelas
+              </label>
+              <input
+                id="parcelas"
+                type="number"
+                min={2}
+                max={48}
+                value={parcelas}
+                onChange={(e) =>
+                  setParcelas(
+                    Math.min(48, Math.max(2, Number(e.target.value) || 2)),
+                  )
+                }
+                className="num w-14 rounded-lg bg-white/10 py-1.5 text-center text-lg outline-none focus:bg-white/16"
+              />
+            </div>
+          )}
+
           <Field
             tone="dark"
             icon={<Tag className="size-5" strokeWidth={2} />}
-            label={categoriaAtual?.nome ?? 'sem categoria'}
-            muted={!categoriaAtual}
+            label={tags.length ? tags.join(', ') : 'tags'}
+            muted={tags.length === 0}
             chevron
-            onClick={() => setSheet('categoria')}
+            onClick={() => setSheet('tags')}
           />
-        )}
 
-        <Field
-          tone="dark"
-          icon={<Pencil className="size-5" strokeWidth={2} />}
-          label="descrição"
-          muted={!descricao}
-        >
-          <input
-            value={descricao}
-            onChange={(e) => setDescricao(e.target.value)}
-            placeholder="descrição"
-            aria-label="descrição"
-            autoComplete="off"
-            className="min-w-0 flex-1 bg-transparent text-lg lowercase outline-none placeholder:text-white/35"
-          />
-        </Field>
+          <div className="px-5 pt-8 pb-6">
+            {recorrencia === 'parcelado' && valor > 0 && (
+              <p className="mb-4 text-center text-sm text-white/45 lowercase">
+                {parcelas}× de{' '}
+                <span className="num">
+                  {formatBRL(splitCents(valor, parcelas)[1] ?? 0)}
+                </span>
+                , a primeira de{' '}
+                <span className="num">
+                  {formatBRL(splitCents(valor, parcelas)[0])}
+                </span>
+              </p>
+            )}
 
-        {/* o input fica visível de propósito: um date input transparente não
-            abre o calendário no desktop, só o ícone nativo abre */}
-        <div
-          onClick={abrirCalendario}
-          className="flex w-full cursor-pointer items-center gap-4 border-b border-line-dark px-5 py-5 transition-colors hover:bg-white/4"
-        >
-          <span className="grid size-7 shrink-0 place-items-center">
-            <Calendar className="size-5" strokeWidth={2} />
-          </span>
-          <label
-            htmlFor="data-lancamento"
-            className="min-w-0 flex-1 cursor-pointer text-lg font-medium lowercase"
-          >
-            data
-          </label>
-          <input
-            id="data-lancamento"
-            ref={dateInput}
-            type="date"
-            value={data}
-            onChange={(e) => e.target.value && setData(e.target.value)}
-            className="num shrink-0 cursor-pointer bg-transparent text-lg text-white/70 outline-none focus-visible:text-white"
-          />
-        </div>
+            {editando && recorrencia !== 'nenhuma' && (
+              <p className="mb-4 text-center text-sm text-white/45 lowercase">
+                esse lançamento se repete — a alteração vale para todas as
+                ocorrências.
+              </p>
+            )}
 
-        <Field
-          tone="dark"
-          icon={<CalendarSync className="size-5" strokeWidth={2} />}
-          label={recurrenceLabel(recorrencia)}
-          muted={recorrencia === 'nenhuma'}
-          chevron
-          onClick={() => setSheet('repeticao')}
-        />
-
-        {recorrencia === 'parcelado' && (
-          <div className="flex items-center gap-4 border-b border-line-dark px-5 py-5">
-            <span className="grid size-7 shrink-0 place-items-center text-white/35">
-              ×
-            </span>
-            <label className="flex-1 text-lg lowercase" htmlFor="parcelas">
-              parcelas
-            </label>
-            <input
-              id="parcelas"
-              type="number"
-              min={2}
-              max={48}
-              value={parcelas}
-              onChange={(e) =>
-                setParcelas(
-                  Math.min(48, Math.max(2, Number(e.target.value) || 2)),
-                )
-              }
-              className="num w-14 rounded-lg bg-white/10 py-1.5 text-center text-lg outline-none focus:bg-white/16"
-            />
-          </div>
-        )}
-
-        <Field
-          tone="dark"
-          icon={<Tag className="size-5" strokeWidth={2} />}
-          label={tags.length ? tags.join(', ') : 'tags'}
-          muted={tags.length === 0}
-          chevron
-          onClick={() => setSheet('tags')}
-        />
-
-        <div className="px-5 pt-8 pb-6">
-          {recorrencia === 'parcelado' && valor > 0 && (
-            <p className="mb-4 text-center text-sm text-white/45 lowercase">
-              {parcelas}× de{' '}
-              <span className="num">
-                {formatBRL(splitCents(valor, parcelas)[1] ?? 0)}
-              </span>
-              , a primeira de{' '}
-              <span className="num">
-                {formatBRL(splitCents(valor, parcelas)[0])}
-              </span>
-            </p>
-          )}
-
-          {editando && recorrencia !== 'nenhuma' && (
-            <p className="mb-4 text-center text-sm text-white/45 lowercase">
-              esse lançamento se repete — a alteração vale para todas as
-              ocorrências.
-            </p>
-          )}
-
-          <Button
-            variant="accent"
-            full
-            onClick={() => void submit()}
-            disabled={valor <= 0 || salvando}
-            className={cn(!saida && 'bg-income-600 hover:bg-income-500')}
-          >
-            {salvando
-              ? 'salvando…'
-              : editando
-                ? 'salvar alterações'
-                : saida
-                  ? 'adicionar saída'
-                  : 'adicionar entrada'}
-          </Button>
-
-          {erro && (
-            <pre
-              role="alert"
-              className="mt-4 overflow-x-auto text-sm whitespace-pre-wrap text-accent-500"
+            <Button
+              variant="accent"
+              full
+              onClick={() => void submit()}
+              disabled={valor <= 0 || salvando}
+              className={cn(!saida && 'bg-income-600 hover:bg-income-500')}
             >
-              {errorMessage(erro)}
-            </pre>
-          )}
-        </div>
-      </div>
+              {salvando
+                ? 'salvando…'
+                : editando
+                  ? 'salvar alterações'
+                  : saida
+                    ? 'adicionar saída'
+                    : 'adicionar entrada'}
+            </Button>
 
-      <NumericKeypad
-        tone="dark"
-        onDigit={(d) => setValor((v) => pushDigit(v, d))}
-        onBackspace={() => setValor(popDigit)}
-      />
+            {erro && (
+              <pre
+                role="alert"
+                className="mt-4 overflow-x-auto text-sm whitespace-pre-wrap text-accent-500"
+              >
+                {errorMessage(erro)}
+              </pre>
+            )}
+          </div>
+        </div>
+
+        <NumericKeypad
+          tone="dark"
+          onDigit={(d) => setValor((v) => pushDigit(v, d))}
+          onBackspace={() => setValor(popDigit)}
+        />
+      </div>
 
       <Sheet
         open={sheet === 'tipo'}
@@ -431,6 +490,46 @@ function EntryForm({ entry }: { entry?: Entry }) {
             {tipo === 'guardado'
               ? 'você ainda não tem nenhuma meta.'
               : 'você ainda não tem categorias.'}
+          </p>
+        )}
+      </Sheet>
+
+      <Sheet
+        open={sheet === 'cartao'}
+        onClose={() => setSheet(null)}
+        title="cartão"
+        tone="dark"
+      >
+        <SheetOption
+          tone="dark"
+          title="à vista"
+          description="débito, pix ou dinheiro — sem cartão"
+          selected={cardId === null}
+          onClick={() => {
+            setCardId(null)
+            setSheet(null)
+          }}
+        />
+        {(cards.data ?? []).map((c) => (
+          <SheetOption
+            key={c.id}
+            tone="dark"
+            title={c.nome}
+            description={
+              c.limiteMensal > 0
+                ? `teto de ${formatBRL(c.limiteMensal)} no mês`
+                : 'sem teto definido'
+            }
+            selected={cardId === c.id}
+            onClick={() => {
+              setCardId(c.id)
+              setSheet(null)
+            }}
+          />
+        ))}
+        {cards.data?.length === 0 && (
+          <p className="px-6 py-6 text-base text-white/50 lowercase">
+            você ainda não tem cartão. dá pra criar um na tela de hoje.
           </p>
         )}
       </Sheet>

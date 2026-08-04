@@ -3,6 +3,8 @@ import { Button } from '../../components/ui/Button'
 import { MoneyInput } from '../../components/ui/MoneyInput'
 import { useIsTouch } from '../../hooks/useIsTouch'
 import { formatBRL } from '../../domain/money'
+import { fromISO, mensalDaMeta } from '../../domain/projection'
+import { monthLabel, todayISO } from '../../lib/date'
 import { cn } from '../../lib/cn'
 import { isFilled, parseDay } from './categoryForm'
 import type { CategoryForm, NumericTarget } from './categoryForm'
@@ -72,6 +74,33 @@ function DayInput({ dia, onChange, active, onActivate }: DayInputProps) {
         'placeholder:font-normal placeholder:text-ink-900/35 focus:border-ink-900/45',
       )}
     />
+  )
+}
+
+/** O mensal da meta não é digitado: mostra a conta acontecendo enquanto se digita. */
+function Plano({
+  valor,
+  dataFinal,
+}: {
+  valor: number
+  dataFinal: string | null
+}) {
+  if (valor <= 0 || !dataFinal) {
+    return (
+      <p className="mt-4 text-sm leading-snug text-ink-900/60">
+        com o valor e o prazo, o app divide pelos meses que faltam.
+      </p>
+    )
+  }
+
+  return (
+    <p className="mt-4 text-sm leading-snug text-ink-900/60">
+      são{' '}
+      <span className="num font-semibold text-ink-900">
+        {formatBRL(mensalDaMeta(valor, dataFinal, new Date()))}
+      </span>{' '}
+      por mês até {monthLabel(fromISO(dataFinal))}, separados do seu diário.
+    </p>
   )
 }
 
@@ -156,15 +185,64 @@ export function CategoryComposer({
       </div>
 
       {step.tipo === 'fixa' && (
-        <div className="mt-5 flex items-center justify-between gap-4">
-          <span className={LABEL}>vence dia</span>
-          <DayInput
-            dia={form.dia}
-            onChange={(dia) => onFormChange({ ...form, dia })}
-            active={target === 'dia'}
-            onActivate={() => onTargetChange('dia')}
-          />
-        </div>
+        <>
+          <div className="mt-5 flex items-center justify-between gap-4">
+            <span className={LABEL}>vence dia</span>
+            <DayInput
+              dia={form.dia}
+              onChange={(dia) => onFormChange({ ...form, dia })}
+              active={target === 'dia'}
+              onActivate={() => onTargetChange('dia')}
+            />
+          </div>
+
+          {/* energia e água vêm todo mês com valor diferente: o previsto delas
+              é estimativa, e o pagamento fecha a conta pelo valor que veio */}
+          <button
+            type="button"
+            onClick={() => onFormChange({ ...form, estimado: !form.estimado })}
+            aria-pressed={form.estimado}
+            className="mt-5 flex w-full items-center gap-3 text-left"
+          >
+            <span
+              className={cn(
+                'grid size-6 shrink-0 place-items-center rounded-md border transition-colors',
+                form.estimado
+                  ? 'border-ink-900 bg-ink-900 text-white'
+                  : 'border-ink-900/25',
+              )}
+              aria-hidden
+            >
+              {form.estimado && '✓'}
+            </span>
+            <span className="text-base lowercase">o valor muda todo mês</span>
+          </button>
+        </>
+      )}
+
+      {step.tipo === 'meta' && (
+        <>
+          <div className="mt-5 flex items-center justify-between gap-4">
+            <label className={LABEL} htmlFor="prazo-da-meta">
+              até quando
+            </label>
+            <input
+              id="prazo-da-meta"
+              type="date"
+              value={form.dataFinal ?? ''}
+              min={todayISO()}
+              onChange={(e) =>
+                onFormChange({ ...form, dataFinal: e.target.value || null })
+              }
+              className={cn(
+                'num h-11 rounded-full border border-ink-900/20 bg-transparent px-4',
+                'text-lg font-semibold outline-none focus:border-ink-900/45',
+              )}
+            />
+          </div>
+
+          <Plano valor={form.valor} dataFinal={form.dataFinal} />
+        </>
       )}
 
       <Button
@@ -173,7 +251,7 @@ export function CategoryComposer({
         full
         className="mt-7"
         onClick={onAdd}
-        disabled={!isFilled(form)}
+        disabled={!isFilled(form, step.tipo)}
       >
         <Plus className="size-4" strokeWidth={2.5} aria-hidden />
         {step.addLabel}
@@ -196,8 +274,20 @@ export function CategoryComposer({
                 </span>
               )}
 
+              {c.valorEstimado && (
+                <span className="shrink-0 text-sm text-ink-900/55 lowercase">
+                  varia
+                </span>
+              )}
+
+              {c.dataFinal !== null && (
+                <span className="num shrink-0 text-sm text-ink-900/55">
+                  até {monthLabel(fromISO(c.dataFinal))}
+                </span>
+              )}
+
               <span className="num shrink-0 text-lg font-semibold">
-                {formatBRL(c.valorPrevisto)}
+                {formatBRL(c.tipo === 'meta' ? (c.metaTotal ?? 0) : c.valorPrevisto)}
               </span>
 
               <button

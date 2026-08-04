@@ -7,8 +7,10 @@ interface CategoryRow {
   nome: string
   tipo: CategoryType
   valor_previsto: number
+  valor_estimado: boolean | null
   dia_vencimento: number | null
   meta_total: number | null
+  data_final: string | null
   cor: string | null
 }
 
@@ -18,8 +20,12 @@ function toDomain(row: CategoryRow): Category {
     nome: row.nome,
     tipo: row.tipo,
     valorPrevisto: row.valor_previsto,
+    valorEstimado: row.valor_estimado ?? false,
     diaVencimento: row.dia_vencimento,
-    metaTotal: row.meta_total,
+    metaTotal: row.meta_total ?? null,
+    // coluna ausente chega `undefined`, e `undefined` não é `null` na hora de
+    // decidir se a meta tem plano
+    dataFinal: row.data_final ?? null,
     cor: row.cor,
   }
 }
@@ -31,8 +37,10 @@ function toRow(draft: CategoryDraft) {
     valor_previsto: Math.abs(Math.round(draft.valorPrevisto)),
     // campos que só existem em um tipo: zerados fora dele, para não sobrar
     // vencimento fantasma numa categoria que virou flexível
+    valor_estimado: draft.tipo === 'fixa' ? draft.valorEstimado : false,
     dia_vencimento: draft.tipo === 'fixa' ? draft.diaVencimento : null,
     meta_total: draft.tipo === 'meta' ? draft.metaTotal : null,
+    data_final: draft.tipo === 'meta' ? draft.dataFinal : null,
     cor: draft.cor,
   }
 }

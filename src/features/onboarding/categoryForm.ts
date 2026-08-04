@@ -2,31 +2,50 @@ import type { CategoryDraft, CategoryType, Cents } from '../../domain/types'
 
 export interface CategoryForm {
   nome: string
+  /** em 'meta' este valor é o total a juntar, não o mensal */
   valor: Cents
   /** só em 'fixa' */
   dia: number | null
+  /** só em 'fixa': a conta vem todo mês, mas o valor muda */
+  estimado: boolean
+  /** só em 'meta': o prazo, YYYY-MM-DD */
+  dataFinal: string | null
 }
 
 /** Qual campo o teclado numérico alimenta: em touch não existe foco de input. */
 export type NumericTarget = 'valor' | 'dia'
 
-export const emptyForm: CategoryForm = { nome: '', valor: 0, dia: null }
+export const emptyForm: CategoryForm = {
+  nome: '',
+  valor: 0,
+  dia: null,
+  estimado: false,
+  dataFinal: null,
+}
 
 /**
- * Nome é o único obrigatório. Valor previsto é uma previsão — energia varia, e
- * exigir um número aqui empurraria o usuário a inventar um.
+ * Nome é o único obrigatório em fixa e flexível. Valor previsto ali é uma
+ * previsão — energia varia, e exigir um número empurraria o usuário a inventar
+ * um. Na meta é o contrário: sem total e sem prazo não há de onde tirar o
+ * quanto por mês, então os dois são obrigatórios.
  */
-export function isFilled(form: CategoryForm): boolean {
-  return form.nome.trim().length > 0
+export function isFilled(form: CategoryForm, tipo: CategoryType): boolean {
+  if (form.nome.trim().length === 0) return false
+  if (tipo !== 'meta') return true
+  return form.valor > 0 && form.dataFinal !== null
 }
 
 export function toDraft(form: CategoryForm, tipo: CategoryType): CategoryDraft {
+  const meta = tipo === 'meta'
   return {
     nome: form.nome.trim(),
     tipo,
-    valorPrevisto: form.valor,
+    // na meta o mensal é calculado: o que o usuário digita é o total
+    valorPrevisto: meta ? 0 : form.valor,
+    valorEstimado: tipo === 'fixa' && form.estimado,
     diaVencimento: tipo === 'fixa' ? form.dia : null,
-    metaTotal: null,
+    metaTotal: meta ? form.valor : null,
+    dataFinal: meta ? form.dataFinal : null,
     cor: null,
   }
 }

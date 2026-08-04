@@ -65,7 +65,7 @@ export function Sheet({
           'lg:max-w-md lg:animate-pop-in lg:rounded-2xl',
           dark
             ? 'bg-surface-dark text-white'
-            : 'bg-white text-ink-900 shadow-2xl shadow-black/10',
+            : 'bg-surface-2 text-ink-900 shadow-2xl shadow-black/10',
         )}
       >
         <header

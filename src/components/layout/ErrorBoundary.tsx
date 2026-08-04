@@ -21,7 +21,7 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, State> {
     if (!error) return this.props.children
 
     return (
-      <div className="grid min-h-svh place-items-center bg-white px-6">
+      <div className="grid min-h-svh place-items-center bg-surface px-6">
         <div className="w-full max-w-md">
           <h1 className="text-2xl font-bold tracking-tight lowercase">
             o app quebrou
@@ -33,7 +33,7 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, State> {
           <button
             type="button"
             onClick={() => window.location.assign('/')}
-            className="mt-6 h-12 w-full rounded-full bg-ink-900 px-6 font-semibold text-white"
+            className="mt-6 h-12 w-full rounded-full bg-solid px-6 font-semibold text-on-solid"
           >
             recarregar
           </button>

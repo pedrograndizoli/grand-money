@@ -33,10 +33,10 @@ export function LegendButton() {
       <Sheet open={open} onClose={() => setOpen(false)} title="legenda">
         <ul className="px-6 py-2">
           <LegendRow swatch={<span className="size-6 rounded bg-positive" />}>
-            saldo positivo naquele dia
+            ainda sobra livre depois do diário daquele dia
           </LegendRow>
           <LegendRow swatch={<span className="size-6 rounded bg-negative" />}>
-            saldo negativo — você passou do limite
+            o livre acabou — daí em diante o mês está no vermelho
           </LegendRow>
           <LegendRow
             swatch={
@@ -45,11 +45,11 @@ export function LegendButton() {
               </span>
             }
           >
-            o diário foi descontado nesse dia
+            o diário reservado para aquele dia
           </LegendRow>
           <LegendRow
             swatch={
-              <span className="num grid size-6 place-items-center rounded bg-ink-900 text-[11px] font-bold text-white">
+              <span className="num grid size-6 place-items-center rounded bg-solid text-[11px] font-bold text-on-solid">
                 7
               </span>
             }
@@ -57,6 +57,12 @@ export function LegendButton() {
             hoje
           </LegendRow>
         </ul>
+
+        <p className="px-6 pt-2 pb-6 text-sm leading-snug text-ink-600 lowercase">
+          dia que já passou não tem projeção: mostra só o que aconteceu. e
+          lançamento marcado para os próximos dias já está descontado do livre —
+          ele aparece na linha do dia, mas não desconta de novo.
+        </p>
       </Sheet>
     </>
   )

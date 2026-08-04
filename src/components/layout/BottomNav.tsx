@@ -5,15 +5,15 @@ import { cn } from '../../lib/cn'
 
 export function BottomNav() {
   const navigate = useNavigate()
-  const [saldos, totais, tags, menu] = NAV
+  const [hoje, saldos, gastos, totais, menu] = NAV
 
   return (
     <nav
       aria-label="navegação principal"
-      className="shrink-0 border-t border-ink-300/70 bg-white pb-[env(safe-area-inset-bottom)] lg:hidden"
+      className="shrink-0 border-t border-ink-300/70 bg-surface pb-[env(safe-area-inset-bottom)] lg:hidden"
     >
-      <ul className="grid grid-cols-5 items-stretch">
-        {[saldos, totais].map((item) => (
+      <ul className="grid grid-cols-6 items-stretch">
+        {[hoje, saldos].map((item) => (
           <NavItemMobile key={item.to} {...item} />
         ))}
 
@@ -22,13 +22,13 @@ export function BottomNav() {
             type="button"
             onClick={() => navigate(NEW_ENTRY)}
             aria-label="novo lançamento"
-            className="grid size-14 place-items-center rounded-full bg-ink-900 text-white transition-transform duration-150 active:scale-95"
+            className="grid size-14 place-items-center rounded-full bg-solid text-on-solid transition-transform duration-150 active:scale-95"
           >
             <Plus className="size-7" strokeWidth={2.5} />
           </button>
         </li>
 
-        {[tags, menu].map((item) => (
+        {[gastos, totais, menu].map((item) => (
           <NavItemMobile key={item.to} {...item} />
         ))}
       </ul>

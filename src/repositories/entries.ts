@@ -9,6 +9,7 @@ interface EntryRow {
   descricao: string | null
   data: string
   category_id: string | null
+  card_id: string | null
   recorrencia: Recurrence
   parcelas: number | null
   tags: string[] | null
@@ -23,6 +24,7 @@ function toDomain(row: EntryRow): Entry {
     descricao: row.descricao,
     data: row.data,
     categoryId: row.category_id,
+    cardId: row.card_id ?? null,
     recorrencia: row.recorrencia,
     parcelas: row.parcelas,
     tags: row.tags ?? [],
@@ -37,6 +39,8 @@ function toRow(draft: EntryDraft) {
     descricao: draft.descricao?.trim() || null,
     data: draft.data,
     category_id: draft.categoryId,
+    // só saída passa em cartão: entrada e guardado não têm forma de pagamento
+    card_id: draft.tipo === 'saida' ? draft.cardId : null,
     recorrencia: draft.recorrencia,
     parcelas: draft.recorrencia === 'parcelado' ? draft.parcelas : null,
     tags: draft.tags,

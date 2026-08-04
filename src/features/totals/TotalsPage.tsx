@@ -3,6 +3,7 @@ import { MonthStepper } from '../../components/layout/MonthStepper'
 import { formatBRL } from '../../domain/money'
 import { allocateMonth } from '../../domain/projection'
 import { useCategories } from '../../hooks/useCategories'
+import { useCards } from '../../hooks/useCards'
 import { useEntries } from '../../hooks/useEntries'
 import { useSettings } from '../../hooks/useSettings'
 import { useMonth } from '../../store/useMonth'
@@ -12,6 +13,7 @@ export function TotalsPage() {
   const { month } = useMonth()
   const { data: settings } = useSettings()
   const { data: categories } = useCategories()
+  const { data: cards } = useCards()
   const { data: entries } = useEntries()
 
   const alloc = useMemo(() => {
@@ -19,11 +21,12 @@ export function TotalsPage() {
     return allocateMonth({
       settings,
       categories: categories ?? [],
+      cards: cards ?? [],
       entries: entries ?? [],
       month,
       today: new Date(),
     })
-  }, [settings, categories, entries, month])
+  }, [settings, categories, cards, entries, month])
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -89,6 +92,26 @@ export function TotalsPage() {
                 raw={`${formatBRL(m.guardado)} / ${formatBRL(m.previsto)}`}
               />
             ))}
+
+            {alloc.cartoes.length > 0 && (
+              <>
+                <h2 className="px-5 pt-8 pb-2 text-sm text-ink-600 lowercase lg:px-8">
+                  por cartão
+                </h2>
+                {alloc.cartoes.map((c) => (
+                  <Line
+                    key={c.cardId}
+                    label={c.nome}
+                    value={c.gasto}
+                    raw={
+                      c.limite > 0
+                        ? `${formatBRL(c.gasto)} / ${formatBRL(c.limite)}`
+                        : formatBRL(c.gasto)
+                    }
+                  />
+                ))}
+              </>
+            )}
 
             <div className="h-8" />
           </>
