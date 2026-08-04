@@ -1,9 +1,11 @@
 import { useNavigate } from 'react-router-dom'
-import { ChevronRight, LogOut, Sigma, Tag, Wallet } from 'lucide-react'
+import { useState } from 'react'
+import { ChevronRight, KeyRound, LogOut, Sigma, Tag, Wallet } from 'lucide-react'
 import { fromISO } from '../../domain/projection'
 import { useCategories } from '../../hooks/useCategories'
 import { useSettings } from '../../hooks/useSettings'
 import { useSession } from '../auth/sessionContext'
+import { SenhaSheet } from '../auth/SenhaSheet'
 import { supabase } from '../../lib/supabase'
 import { APP } from '../../config/app'
 import { shortDate } from '../../lib/date'
@@ -13,6 +15,7 @@ export function MenuPage() {
   const { session } = useSession()
   const { data: settings } = useSettings()
   const { data: categories } = useCategories()
+  const [trocandoSenha, setTrocandoSenha] = useState(false)
 
   return (
     <div className="flex min-h-0 flex-1 flex-col lg:mx-auto lg:w-full lg:max-w-3xl">
@@ -40,6 +43,11 @@ export function MenuPage() {
           onClick={() => navigate('/tags')}
         />
         <Item
+          icon={<KeyRound className="size-5" strokeWidth={2} />}
+          label="senha de acesso"
+          onClick={() => setTrocandoSenha(true)}
+        />
+        <Item
           icon={<Wallet className="size-5" strokeWidth={2} />}
           label="atualizar meu saldo"
           value={settings ? shortDate(fromISO(settings.saldoRef)) : undefined}
@@ -57,6 +65,10 @@ export function MenuPage() {
           {APP.name}
         </p>
       </div>
+
+      {trocandoSenha && (
+        <SenhaSheet onClose={() => setTrocandoSenha(false)} />
+      )}
     </div>
   )
 }

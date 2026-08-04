@@ -144,9 +144,21 @@ repositories. Isso mantém o motor de projeção puro e testável.
 
 ### Autenticação
 
-Magic link (OTP por e-mail) do Supabase Auth. Sem senha, sem cadastro, sem
-recuperação de conta — é uma tela só com campo de e-mail e botão `entrar`. Rota
-`/entrar`, com `RequireAuth` envolvendo todo o resto.
+Supabase Auth com **e-mail e senha** como caminho principal e **magic link**
+(OTP) como alternativa, na mesma tela `/entrar`, com `RequireAuth` envolvendo
+todo o resto. Sem cadastro: o usuário é criado uma vez e os signups ficam
+desligados no painel.
+
+Os dois métodos são do **mesmo** usuário — senha não substitui o link, soma.
+`supabase.auth.updateUser({ password })` mexe na linha existente de
+`auth.users`, então o `id` não muda e nada que pende dele por `user_id` se
+perde. Trocar de método **nunca** deve virar usuário novo: uuid diferente é
+conta diferente, e a RLS esconderia todo o histórico.
+
+Definir e trocar senha fica no menu (`auth/SenhaSheet`), não no painel do
+Supabase — é por ali que se recupera o acesso: entra pelo link mágico e troca a
+senha. O link só abre no aparelho onde se toca nele, e é justamente essa
+limitação que a senha existe para resolver (entrar num segundo aparelho).
 
 `user_id` em todas as tabelas, com RLS ligada e policy
 `auth.uid() = user_id` para select/insert/update/delete. Isso não é opcional:
