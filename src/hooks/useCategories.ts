@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
+  createCategories,
   createCategory,
   deleteCategory,
   listCategories,
@@ -28,6 +29,14 @@ export function useCreateCategory() {
   const invalidate = useCategoriesInvalidation()
   return useMutation({
     mutationFn: (draft: CategoryDraft) => createCategory(draft),
+    onSuccess: invalidate,
+  })
+}
+
+export function useCreateCategories() {
+  const invalidate = useCategoriesInvalidation()
+  return useMutation({
+    mutationFn: (drafts: CategoryDraft[]) => createCategories(drafts),
     onSuccess: invalidate,
   })
 }

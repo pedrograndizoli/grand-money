@@ -63,6 +63,22 @@ export async function createCategory(
   return toDomain(data)
 }
 
+/** Um insert só: o onboarding grava tudo de uma vez ou não grava nada. */
+export async function createCategories(
+  drafts: CategoryDraft[],
+): Promise<Category[]> {
+  if (drafts.length === 0) return []
+  const userId = await requireUserId()
+  const { data, error } = await supabase
+    .from('categories')
+    .insert(drafts.map((draft) => ({ ...toRow(draft), user_id: userId })))
+    .select()
+    .returns<CategoryRow[]>()
+
+  if (error) throw error
+  return data.map(toDomain)
+}
+
 export async function updateCategory(
   id: string,
   draft: CategoryDraft,

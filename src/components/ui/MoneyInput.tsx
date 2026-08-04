@@ -20,6 +20,10 @@ interface MoneyInputProps {
   size?: Size
   underline?: boolean
   autoFocus?: boolean
+  /** em touch, quem manda no caret: falso quando o teclado alimenta outro campo */
+  active?: boolean
+  /** o campo pediu o teclado de volta */
+  onActivate?: () => void
 }
 
 /**
@@ -35,6 +39,8 @@ export function MoneyInput({
   size = 'xl',
   underline = false,
   autoFocus = false,
+  active = true,
+  onActivate,
 }: MoneyInputProps) {
   const isTouch = useIsTouch()
   const input = useRef<HTMLInputElement>(null)
@@ -81,6 +87,8 @@ export function MoneyInput({
           aria-readonly="true"
           aria-label={label}
           tabIndex={0}
+          onClick={onActivate}
+          onFocus={onActivate}
           className={cn(
             'num flex min-w-0 flex-1 items-center gap-px font-semibold tracking-tight',
             s.text,
@@ -88,7 +96,7 @@ export function MoneyInput({
         >
           {empty ? (
             <>
-              {caret}
+              {active && caret}
               <span className={placeholder}>0,00</span>
             </>
           ) : (
@@ -96,7 +104,7 @@ export function MoneyInput({
               <span className={cn('truncate', filled)}>
                 {formatCents(value)}
               </span>
-              {caret}
+              {active && caret}
             </>
           )}
         </div>
@@ -109,7 +117,10 @@ export function MoneyInput({
           aria-label={label}
           value={empty ? '' : formatCents(value)}
           placeholder="0,00"
-          onFocus={() => setFocused(true)}
+          onFocus={() => {
+            setFocused(true)
+            onActivate?.()
+          }}
           onBlur={() => setFocused(false)}
           onChange={(e) => onChange(parseBRL(e.target.value))}
           className={cn(

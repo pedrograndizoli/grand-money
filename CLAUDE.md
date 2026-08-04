@@ -190,7 +190,7 @@ src/
     layout/                AppShell, BottomNav, Sidebar, MonthStepper, BrandScreen
   features/
     auth/                  tela /entrar + RequireAuth
-    onboarding/            um passo só: quanto você tem hoje
+    onboarding/            4 passos: saldo de hoje + categorias iniciais
     balances/              tela principal — a alocação do mês
     entry-form/            criar/editar/apagar lançamento
     totals/  tags/  menu/
@@ -256,17 +256,27 @@ parágrafo explicativo em `ink-900/60`. No rodapé, dois botões empilhados:
 `calcular previsão de diário` (preto, sólido) e `calcular depois` (contorno).
 
 ### 5.2 Onboarding (`/onboarding/:step`)
-**Um passo só:** quanto você tem hoje. A renda não é mais estimada aqui — ela
-chega em lançamentos de entrada — e categorias são criadas como entidade, fora
-do onboarding.
+**Quatro passos**, quatro bolinhas: 1) saldo de hoje · 2) contas fixas ·
+3) tetos flexíveis · 4) meta (opcional, com `pular`). A renda não é estimada
+aqui — ela chega em lançamentos de entrada.
 
-Layout: seta voltar + bolinhas de progresso no topo, pergunta em display grande,
-`MoneyInput` gigante com `R$` fixo e placeholder `0,00`, texto de ajuda embaixo,
-botão preto no rodapé. O texto do passo fica em `features/onboarding/steps.ts` —
-conversacional, não corporativo.
+Layout comum: seta voltar + bolinhas de progresso no topo, pergunta em display
+grande, botão preto no rodapé. O texto de cada passo fica em
+`features/onboarding/steps.ts` — conversacional, não corporativo.
 
-O teclado numérico customizado (3×4, com apagar) aparece **só em touch**. No
-desktop o input recebe foco e usa o teclado real.
+O passo 1 é um `MoneyInput` gigante com `R$` fixo e placeholder `0,00`. Os
+passos 2 a 4 usam o `CategoryComposer`: chips com nomes comuns (aluguel,
+energia, mercado…), campo de nome, valor, `vence dia` só em `fixa`,
+`adicionar outra` e a lista do que já entrou, com remover. O mesmo nome no mesmo
+tipo atualiza a linha em vez de duplicar.
+
+Nada é gravado no meio do caminho: as categorias ficam num rascunho em
+`sessionStorage` e vão para o banco num insert só (`createCategories`) junto com
+`settings`, no fim do último passo.
+
+O teclado numérico customizado (3×4, com apagar) aparece **só em touch**, e
+alimenta um campo por vez — `valor` ou `dia`, conforme o último tocado. No
+desktop os inputs recebem foco e usam o teclado real.
 
 ### 5.3 Alocação (`/`) — tela principal
 Tema claro, `‹ ago/26 ›` no topo. De cima para baixo:

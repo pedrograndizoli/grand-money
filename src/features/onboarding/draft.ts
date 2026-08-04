@@ -1,10 +1,14 @@
-import type { StepKey } from './steps'
+import type { CategoryDraft, Cents } from '../../domain/types'
 
 const KEY = 'onboarding:draft'
 
-export type Draft = Partial<Record<StepKey, number>>
+export interface Draft {
+  saldoInicial?: Cents
+  /** categorias montadas nos passos 2 a 4, gravadas só no fim */
+  categorias?: CategoryDraft[]
+}
 
-/** Guarda o rascunho entre os 5 passos para um refresh não zerar tudo. */
+/** Guarda o rascunho entre os passos para um refresh não zerar tudo. */
 export function readDraft(): Draft {
   try {
     const raw = sessionStorage.getItem(KEY)
