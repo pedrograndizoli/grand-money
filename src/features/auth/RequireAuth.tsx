@@ -10,7 +10,15 @@ export function RequireAuth() {
 
   if (loading) return <Splash />
   if (!session) {
-    return <Navigate to="/entrar" replace state={{ from: location.pathname }} />
+    // leva junto o que voltou do link de e-mail: é a única pista que a tela de
+    // entrar tem para dizer por que o link não funcionou
+    return (
+      <Navigate
+        to={`/entrar${location.search}${location.hash}`}
+        replace
+        state={{ from: location.pathname }}
+      />
+    )
   }
   return <Outlet />
 }

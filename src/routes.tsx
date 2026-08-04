@@ -2,6 +2,8 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 import { AppShell } from './components/layout/AppShell'
 import { RequireAuth, RequireOnboarding } from './features/auth/RequireAuth'
 import { LoginPage } from './features/auth/LoginPage'
+import { RecoverPage } from './features/auth/RecoverPage'
+import { useRecoveryRedirect } from './features/auth/useRecoveryRedirect'
 import { WelcomePage } from './features/onboarding/WelcomePage'
 import { OnboardingPage } from './features/onboarding/OnboardingPage'
 import { TodayPage } from './features/today/TodayPage'
@@ -13,9 +15,14 @@ import { TagsPage } from './features/tags/TagsPage'
 import { MenuPage } from './features/menu/MenuPage'
 
 export function AppRoutes() {
+  useRecoveryRedirect()
+
   return (
     <Routes>
       <Route path="/entrar" element={<LoginPage />} />
+      {/* fora do RequireAuth: sem sessão, esta tela explica o link em vez de
+          devolver para o login sem uma palavra */}
+      <Route path="/nova-senha" element={<RecoverPage />} />
 
       <Route element={<RequireAuth />}>
         <Route path="/bem-vindo" element={<WelcomePage />} />

@@ -61,6 +61,7 @@ por 65 testes.
 | `/tags` | recorte por etiqueta |
 | `/lancamento/novo` · `/lancamento/:id` | criar e editar, em tema escuro, com recorrência e parcelamento |
 | `/entrar` | e-mail e senha, com link mágico como alternativa |
+| `/nova-senha` | onde o link de recuperação cai — pedido sempre a partir do app |
 | `/bem-vindo` · `/onboarding/:step` | quatro passos: saldo de hoje, contas, tetos, meta |
 
 Nenhum status é gravado. "Pago" é o lançamento existir com data até hoje; "a
@@ -113,9 +114,14 @@ O `with check` não é enfeite: só com `using`, o INSERT passa pelo SELECT e mo
 na escrita com `42501`. E uma tabela sem policy num site publicado é o banco
 inteiro exposto pela anon key — são dados financeiros.
 
-**2. Auth.** Em Authentication → Providers, deixe só Email ligado. Crie sua conta,
-**desligue signups** e adicione as URLs de redirect (`http://localhost:5173` e a
-de produção).
+**2. Auth.** Em Authentication → Providers, deixe só Email ligado. Crie sua conta
+e **desligue signups**. Em URL Configuration → Redirect URLs, adicione
+`http://localhost:5173/**` e o equivalente da produção — precisa cobrir
+`/nova-senha`, senão o link de recuperação cai na Site URL.
+
+Recuperação de senha se pede **pelo app** (`esqueci minha senha` na tela de
+entrar), nunca pelo painel do Supabase: com PKCE, o link só abre no navegador
+que pediu, e um link disparado pelo painel é descartado em silêncio.
 
 **3. Chaves.**
 

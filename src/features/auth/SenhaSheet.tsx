@@ -1,11 +1,8 @@
-import { useState } from 'react'
 import { Button } from '../../components/ui/Button'
 import { Sheet } from '../../components/ui/Sheet'
 import { PasswordInput } from '../../components/ui/PasswordInput'
-import { supabase } from '../../lib/supabase'
 import { cn } from '../../lib/cn'
-
-const MINIMO = 6
+import { useNovaSenha, MINIMO_SENHA } from './useNovaSenha'
 
 const CAMPO = cn(
   'w-full border-b border-line-dark bg-transparent py-2',
@@ -21,30 +18,19 @@ const ROTULO = 'mb-1 block text-xs font-semibold text-white/45 lowercase'
  * pende dele por `user_id` — continua o mesmo.
  */
 export function SenhaSheet({ onClose }: { onClose: () => void }) {
-  const [senha, setSenha] = useState('')
-  const [confirma, setConfirma] = useState('')
-  const [salvando, setSalvando] = useState(false)
-  const [erro, setErro] = useState<string | null>(null)
-  const [pronto, setPronto] = useState(false)
-
-  const curta = senha.length > 0 && senha.length < MINIMO
-  const diferente = confirma.length > 0 && confirma !== senha
-  const valido = senha.length >= MINIMO && confirma === senha
-
-  async function salvar() {
-    if (!valido || salvando) return
-    setSalvando(true)
-    setErro(null)
-
-    const { error } = await supabase.auth.updateUser({ password: senha })
-
-    setSalvando(false)
-    if (error) {
-      setErro(error.message.toLowerCase())
-      return
-    }
-    setPronto(true)
-  }
+  const {
+    senha,
+    setSenha,
+    confirma,
+    setConfirma,
+    curta,
+    diferente,
+    valido,
+    salvando,
+    erro,
+    pronto,
+    salvar,
+  } = useNovaSenha()
 
   return (
     <Sheet open onClose={onClose} title="senha de acesso" tone="dark">
@@ -64,7 +50,7 @@ export function SenhaSheet({ onClose }: { onClose: () => void }) {
             <label className={ROTULO}>nova senha</label>
             <PasswordInput
               autoComplete="new-password"
-              placeholder={`mínimo ${MINIMO} caracteres`}
+              placeholder={`mínimo ${MINIMO_SENHA} caracteres`}
               value={senha}
               onChange={(e) => setSenha(e.target.value)}
               className={CAMPO}
@@ -81,7 +67,7 @@ export function SenhaSheet({ onClose }: { onClose: () => void }) {
 
             <p className="mt-5 text-sm leading-snug text-white/45 lowercase">
               {curta
-                ? `a senha precisa de pelo menos ${MINIMO} caracteres.`
+                ? `a senha precisa de pelo menos ${MINIMO_SENHA} caracteres.`
                 : diferente
                   ? 'as duas não estão iguais.'
                   : 'isso não cria conta nova: é a mesma conta, com mais um jeito de entrar. o link mágico continua funcionando.'}

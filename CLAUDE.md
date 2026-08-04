@@ -174,10 +174,37 @@ Os dois métodos são do **mesmo** usuário — senha não substitui o link, som
 perde. Trocar de método **nunca** deve virar usuário novo: uuid diferente é
 conta diferente, e a RLS esconderia todo o histórico.
 
-Definir e trocar senha fica no menu (`auth/SenhaSheet`), não no painel do
-Supabase — é por ali que se recupera o acesso: entra pelo link mágico e troca a
-senha. O link só abre no aparelho onde se toca nele, e é justamente essa
-limitação que a senha existe para resolver (entrar num segundo aparelho).
+Definir e trocar senha, já logado, fica no menu (`auth/SenhaSheet`), não no
+painel do Supabase. O link mágico só abre no aparelho onde se toca nele, e é
+justamente essa limitação que a senha existe para resolver (entrar num segundo
+aparelho).
+
+**Recuperação de senha: o pedido tem que sair do app.** `flowType: 'pkce'` faz o
+link voltar como `?code=`, e o supabase-js só troca esse código por sessão se
+achar o *code verifier* no localStorage — que ele grava no navegador que
+**pediu** o link. Um e-mail de recuperação disparado pelo painel do Supabase não
+tem verifier nenhum: `_isPKCECallback` devolve `false`, o código é **descartado
+em silêncio**, e o usuário cai na tela de entrar sem erro nem explicação. Foi
+assim que se perdeu o acesso uma vez.
+
+Por isso o fluxo é todo interno:
+
+| peça | papel |
+|---|---|
+| `esqueci minha senha` em `/entrar` | `resetPasswordForEmail` com `redirectTo` para `/nova-senha` — é este pedido que planta o verifier |
+| `/nova-senha` (`auth/RecoverPage`) | onde o link cai. **Fora do `RequireAuth`**: sem sessão ela explica o link em vez de devolver ao login |
+| `auth/useNovaSenha` | a regra da senha nova, dividida com o `SenhaSheet` — dois mínimos separados divergem |
+| `auth/callback.ts` | lê `error_description`, `error_code` e o `?code=` órfão que sobrou na URL |
+| `auth/useRecoveryRedirect` | `PASSWORD_RECOVERY` → `/nova-senha`, para quando o `redirectTo` não está na allowlist e o Supabase joga na Site URL |
+
+`RequireAuth` repassa `search` e `hash` ao mandar para `/entrar`: sem isso a
+única pista do que aconteceu com o link se perde no redirect. **Nunca troque
+essa tela por um redirect mudo** — link de e-mail falha por cinco motivos
+diferentes, e todos eles são invisíveis sem essa mensagem.
+
+Toda URL usada em `redirectTo` precisa estar em Authentication → URL
+Configuration → Redirect URLs, incluindo `/nova-senha`. Fora da lista, o
+Supabase ignora e manda para a Site URL.
 
 `user_id` em todas as tabelas, com RLS ligada e policy
 `auth.uid() = user_id` para select/insert/update/delete. Isso não é opcional:
