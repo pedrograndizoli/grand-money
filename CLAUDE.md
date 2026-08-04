@@ -145,7 +145,7 @@ livre no instante em que fosse guardado.
 | Camada | Escolha |
 |---|---|
 | Build | Vite |
-| UI | React 18 + TypeScript (strict) |
+| UI | React 19 + TypeScript (strict) |
 | Estilo | Tailwind v4 (`@tailwindcss/vite`, config via `@theme` no CSS) |
 | Rotas | React Router v6 |
 | Estado de UI | Zustand |
