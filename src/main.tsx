@@ -6,9 +6,12 @@ import '@fontsource-variable/outfit'
 import '@fontsource-variable/inter'
 import './index.css'
 import { queryClient } from './lib/queryClient'
+import { registerServiceWorker } from './lib/pwa'
 import { SessionProvider } from './features/auth/session'
 import { ErrorBoundary } from './components/layout/ErrorBoundary'
 import { AppRoutes } from './routes'
+
+registerServiceWorker()
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

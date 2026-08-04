@@ -150,6 +150,42 @@ juntas se forem simples.
 
 ---
 
+## Sessão 9 — instalável no celular (PWA) · feita
+
+Manifest, ícones, metas de iOS e um service worker que só destrava o "instalar
+app" do Android — sem cache, offline segue fora do escopo. O porquê de cada
+peça está no `CLAUDE.md`, seção 2.
+
+**Regerar os ícones** (quando a marca mudar). Não tem rasterizador no projeto;
+os PNGs saem do Chrome headless, a partir do `favicon.svg` (cantos
+arredondados) e do `icon-square.svg` (full-bleed). O `--force-device-scale-factor`
+não é frescura: o Chrome trava a janela num tamanho mínimo, e pedir
+`--window-size=192,192` direto devolve um PNG cortado.
+
+```bash
+CHROME="/c/Program Files/Google/Chrome/Application/chrome.exe"
+P="$PWD/public"
+shot() {  # $1=fonte  $2=lado  $3=saída
+  "$CHROME" --headless --disable-gpu --hide-scrollbars \
+    --default-background-color=00000000 \
+    --window-size=$(($2*4)),$(($2*4)) --force-device-scale-factor=0.25 \
+    --screenshot="$P/$3" "file:///$P/$1"
+}
+shot favicon.svg     192 icon-192.png
+shot favicon.svg     512 icon-512.png
+shot icon-square.svg 512 icon-maskable-512.png
+shot icon-square.svg 180 apple-touch-icon.png
+```
+
+Confira os quatro **abrindo as imagens**, não só o tamanho do arquivo: o corte
+do Chrome gera um PNG com as dimensões certas e o desenho errado.
+
+O prompt de instalação exige HTTPS — em `localhost` funciona, no dev pelo IP da
+rede não. No iPhone nunca aparece prompt: é Compartilhar → adicionar à tela de
+início.
+
+---
+
 ## Hábitos que cortam consumo pela metade
 
 - `/clear` entre sessões, sempre. Contexto acumulado é o que mais custa.

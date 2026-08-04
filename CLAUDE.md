@@ -255,6 +255,32 @@ create policy "own <tabela>" on <tabela>
 **Offline não está no escopo.** O site exige conexão. Se isso incomodar depois,
 a solução é cache do TanStack Query persistido, não um motor de sincronização.
 
+### Instalação (PWA)
+
+O app é **instalável**: abre pelo ícone, em tela cheia, sem barra do navegador.
+É um app que se consulta várias vezes por dia — a barra do navegador em cima do
+diário é ruído. Isso são quatro coisas, e nenhuma delas é offline:
+
+- `public/manifest.webmanifest` — `display: standalone`, `start_url: /`, nome e
+  ícones.
+- Ícones em `public/`: `icon-192/512.png` (cantos arredondados, `purpose: any`),
+  `icon-maskable-512.png` (full-bleed, o Android recorta no formato do launcher)
+  e `apple-touch-icon.png` (180 — o iOS ignora os ícones do manifest na tela de
+  início). Todos derivados do `favicon.svg` e do `icon-square.svg`; a receita de
+  regerar está no `PLANO.md`.
+- `theme-color` acompanha o tema. Instalado, o Android pinta a barra de status
+  com esse valor: fixo no branco, ela viraria uma tira clara em cima do app
+  escuro. `store/useTheme` reescreve a meta lendo `--color-surface` já
+  resolvido, para não hardcodar hex fora do `index.css`.
+- `public/sw.js` — service worker **de instalação, não de offline**. Existe
+  porque o Chrome no Android só oferece "instalar app" a quem tem um service
+  worker com handler de `fetch`; sem ele sobra o atalho genérico, que abre com
+  barra do navegador. Ele repassa a navegação para a rede e **não guarda nada**.
+
+Não transforme o `sw.js` em cache achando que ele está pela metade. Saldo
+servido de cache velho mente sobre o dinheiro, e é exatamente essa mentira que o
+app existe para não contar. Registrado por `lib/pwa.ts`, só em produção.
+
 ---
 
 ## 3. Estrutura de pastas

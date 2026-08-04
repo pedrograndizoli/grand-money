@@ -16,9 +16,25 @@ function lido(): Theme {
   }
 }
 
+/**
+ * Instalado, a barra de status do sistema é pintada com o `theme-color`. Fixo
+ * no branco, ela viraria uma tira clara em cima do app escuro — então o valor
+ * sai do token já resolvido, depois da classe trocar. Vazio (dev, antes do CSS
+ * entrar) mantém o que veio do HTML.
+ */
+function pintarBarraDeStatus(): void {
+  const meta = document.querySelector('meta[name="theme-color"]')
+  if (!meta) return
+  const surface = getComputedStyle(document.documentElement)
+    .getPropertyValue('--color-surface')
+    .trim()
+  if (surface) meta.setAttribute('content', surface)
+}
+
 /** A classe é a fonte da verdade visual: os tokens do CSS penduram nela. */
 function aplicar(theme: Theme): void {
   document.documentElement.classList.toggle('dark', theme === 'dark')
+  pintarBarraDeStatus()
   try {
     localStorage.setItem(KEY, theme)
   } catch {
