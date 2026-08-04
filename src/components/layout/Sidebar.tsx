@@ -1,25 +1,18 @@
-import { NavLink, useNavigate } from 'react-router-dom'
+import { NavLink } from 'react-router-dom'
 import { Plus } from 'lucide-react'
-import { NAV, NEW_ENTRY } from './nav'
+import { NAV } from './nav'
 import { Button } from '../ui/Button'
 import { APP } from '../../config/app'
 import { cn } from '../../lib/cn'
 
-export function Sidebar() {
-  const navigate = useNavigate()
-
+export function Sidebar({ onNovo }: { onNovo: () => void }) {
   return (
     <aside className="hidden w-60 shrink-0 flex-col border-r border-ink-300/70 bg-surface px-5 py-7 lg:flex">
       <p className="px-2 text-sm font-semibold tracking-[0.18em] text-ink-600 uppercase">
         {APP.name}
       </p>
 
-      <Button
-        size="md"
-        full
-        className="mt-6"
-        onClick={() => navigate(NEW_ENTRY)}
-      >
+      <Button size="md" full className="mt-6" onClick={onNovo}>
         <Plus className="size-5" strokeWidth={2.5} />
         novo
       </Button>

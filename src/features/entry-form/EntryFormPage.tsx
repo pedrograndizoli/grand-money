@@ -1,5 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Navigate, useNavigate, useParams } from 'react-router-dom'
+import {
+  Navigate,
+  useNavigate,
+  useParams,
+  useSearchParams,
+} from 'react-router-dom'
 import {
   ArrowDownLeft,
   ArrowUpRight,
@@ -73,8 +78,23 @@ export function EntryFormPage() {
   return <EntryForm key={entry.id} entry={entry} />
 }
 
+/** `?tipo=` e `?abrir=` chegam do sheet de "adicionar" — só valem ao criar. */
+function intencao(params: URLSearchParams): {
+  tipo: EntryType
+  sheet: OpenSheet
+} {
+  const tipo = params.get('tipo')
+  const abrir = params.get('abrir')
+  return {
+    tipo: tipo === 'entrada' || tipo === 'guardado' ? tipo : 'saida',
+    sheet: abrir === 'categoria' || abrir === 'cartao' ? abrir : null,
+  }
+}
+
 function EntryForm({ entry }: { entry?: Entry }) {
   const navigate = useNavigate()
+  const [params] = useSearchParams()
+  const inicio = intencao(params)
   const create = useCreateEntry()
   const update = useUpdateEntry()
   const remove = useDeleteEntry()
@@ -83,7 +103,7 @@ function EntryForm({ entry }: { entry?: Entry }) {
   const editando = entry !== undefined
 
   const [valor, setValor] = useState(entry?.valor ?? 0)
-  const [tipo, setTipo] = useState<EntryType>(entry?.tipo ?? 'saida')
+  const [tipo, setTipo] = useState<EntryType>(entry?.tipo ?? inicio.tipo)
   const [descricao, setDescricao] = useState(entry?.descricao ?? '')
   const [data, setData] = useState(entry?.data ?? todayISO())
   const [recorrencia, setRecorrencia] = useState<Recurrence>(
@@ -95,7 +115,9 @@ function EntryForm({ entry }: { entry?: Entry }) {
     entry?.categoryId ?? null,
   )
   const [cardId, setCardId] = useState<string | null>(entry?.cardId ?? null)
-  const [sheet, setSheet] = useState<OpenSheet>(null)
+  // criar já com a lista certa aberta: quem escolheu "conta fixa" vai escolher
+  // a conta agora, não depois de olhar a tela inteira
+  const [sheet, setSheet] = useState<OpenSheet>(entry ? null : inicio.sheet)
   const dateInput = useRef<HTMLInputElement>(null)
 
   const categories = useCategories()

@@ -436,7 +436,15 @@ conferir fecha a conta. **`no cartão` é recorte, não fluxo**: aquelas saídas
 estão contadas em gasto livre ou contas fixas, e a linha diz isso. Somar as
 cinco linhas não dá o gasto do mês.
 
-### 5.7 Lançamento (`/lancamento/novo` e `/lancamento/:id`)
+### 5.7 Adicionar (sheet) e lançamento (`/lancamento/novo` e `/lancamento/:id`)
+O FAB e o `+ novo` da sidebar abrem antes o sheet **adicionar**
+(`entry-form/NewEntrySheet`), com cinco caminhos: entrada · conta fixa · gasto
+livre · guardado · gasto no cartão. Não são cinco tipos — são os três tipos de
+lançamento mais dois atalhos de saída. A escolha vira query no formulário
+(`?tipo=` e `?abrir=categoria|cartao`): `tipo` define o tipo já selecionado e
+`abrir` faz o formulário nascer com aquela lista aberta. Query só vale ao criar;
+em edição, o lançamento manda.
+
 Tema **escuro**, contrastando com o resto do app. Valor grande no topo, depois
 linhas separadas por hairline: tipo, categoria, cartão, descrição, data,
 repetição, tags. Botão laranja no rodapé. Teclado numérico embaixo (touch).

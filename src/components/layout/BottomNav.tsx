@@ -1,10 +1,9 @@
-import { NavLink, useNavigate } from 'react-router-dom'
+import { NavLink } from 'react-router-dom'
 import { Plus } from 'lucide-react'
-import { NAV, NEW_ENTRY } from './nav'
+import { NAV } from './nav'
 import { cn } from '../../lib/cn'
 
-export function BottomNav() {
-  const navigate = useNavigate()
+export function BottomNav({ onNovo }: { onNovo: () => void }) {
   const [hoje, saldos, gastos, totais, menu] = NAV
 
   return (
@@ -20,7 +19,7 @@ export function BottomNav() {
         <li className="grid place-items-center">
           <button
             type="button"
-            onClick={() => navigate(NEW_ENTRY)}
+            onClick={onNovo}
             aria-label="novo lançamento"
             className="grid size-14 place-items-center rounded-full bg-solid text-on-solid transition-transform duration-150 active:scale-95"
           >
