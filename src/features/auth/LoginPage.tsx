@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import { useLocation } from 'react-router-dom'
+import { Navigate, useLocation } from 'react-router-dom'
 import { Mail } from 'lucide-react'
 import { BrandScreen } from '../../components/layout/BrandScreen'
 import { Button } from '../../components/ui/Button'
@@ -7,6 +7,8 @@ import { PasswordInput } from '../../components/ui/PasswordInput'
 import { supabase } from '../../lib/supabase'
 import { APP } from '../../config/app'
 import { lerRetornoDoLink } from './callback'
+import { chamarAuth, mensagemDeErro } from './chamada'
+import { useSession } from './sessionContext'
 
 type Envio = 'link' | 'reset'
 type Ocupado = 'senha' | 'link' | 'reset'
@@ -17,17 +19,10 @@ const AVISO_CODIGO_ORFAO =
 const CAMPO =
   'w-full border-b border-ink-900/15 bg-transparent py-2 text-2xl font-medium tracking-tight outline-none placeholder:text-ink-900/30 focus:border-ink-900/50'
 
-/** As mensagens do Supabase vêm em inglês e cruas demais para uma tela de entrada. */
-function mensagemDeErro(erro: string): string {
-  const m = erro.toLowerCase()
-  if (m.includes('invalid login credentials')) return 'e-mail ou senha não conferem'
-  if (m.includes('email not confirmed')) return 'confirme seu e-mail antes de entrar'
-  if (m.includes('email logins are disabled')) return 'login por e-mail está desligado no supabase'
-  if (m.includes('expired') || m.includes('link is invalid') || m.includes('access_denied'))
-    return 'esse link expirou ou já foi usado. peça outro aqui.'
-  if (m.includes('rate limit') || m.includes('too many'))
-    return 'muitas tentativas seguidas. espere um minuto'
-  return m
+/** para onde ir depois de entrar: de volta ao que o `RequireAuth` interrompeu */
+function destinoDe(state: unknown): string {
+  const from = (state as { from?: unknown } | null)?.from
+  return typeof from === 'string' && from.startsWith('/') ? from : '/'
 }
 
 /**
@@ -37,11 +32,13 @@ function mensagemDeErro(erro: string): string {
  */
 export function LoginPage() {
   const location = useLocation()
+  const { session } = useSession()
   const [email, setEmail] = useState('')
   const [senha, setSenha] = useState('')
   const [enviado, setEnviado] = useState<Envio | null>(null)
   const [ocupado, setOcupado] = useState<Ocupado | null>(null)
   const [erro, setErro] = useState<string | null>(null)
+  const [entrou, setEntrou] = useState(false)
 
   // por que você caiu aqui: o `RequireAuth` repassa o que voltou do link
   const [avisoDoLink, setAvisoDoLink] = useState(() => {
@@ -61,20 +58,32 @@ export function LoginPage() {
 
   async function entrarComSenha(e: FormEvent) {
     e.preventDefault()
-    if (!email.trim() || !senha || ocupado) return
+    if (ocupado) return
+    // o botão não fica mais cinza sem explicar: campo vazio vira mensagem
+    if (!email.trim() || !senha) {
+      setErro('digite seu e-mail e a senha')
+      return
+    }
 
     setOcupado('senha')
     setErro(null)
     setAvisoDoLink(null)
 
-    const { error } = await supabase.auth.signInWithPassword({
-      email: email.trim(),
-      password: senha,
-    })
+    const falha = await chamarAuth(() =>
+      supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password: senha,
+      }),
+    )
 
-    setOcupado(null)
-    // no sucesso não há o que fazer aqui: a sessão muda e o RequireAuth entra
-    if (error) setErro(mensagemDeErro(error.message))
+    if (falha) {
+      setOcupado(null)
+      setErro(falha)
+      return
+    }
+    // `ocupado` segue ligado de propósito: a tela só sai daqui quando a sessão
+    // chegar no provider, e até lá o botão continua dizendo "entrando…"
+    setEntrou(true)
   }
 
   async function enviarLink() {
@@ -88,13 +97,15 @@ export function LoginPage() {
     setErro(null)
     setAvisoDoLink(null)
 
-    const { error } = await supabase.auth.signInWithOtp({
-      email: email.trim(),
-      options: { emailRedirectTo: window.location.origin },
-    })
+    const falha = await chamarAuth(() =>
+      supabase.auth.signInWithOtp({
+        email: email.trim(),
+        options: { emailRedirectTo: window.location.origin },
+      }),
+    )
 
     setOcupado(null)
-    if (error) setErro(mensagemDeErro(error.message))
+    if (falha) setErro(falha)
     else setEnviado('link')
   }
 
@@ -115,14 +126,26 @@ export function LoginPage() {
     setErro(null)
     setAvisoDoLink(null)
 
-    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-      redirectTo: `${window.location.origin}/nova-senha`,
-    })
+    const falha = await chamarAuth(() =>
+      supabase.auth.resetPasswordForEmail(email.trim(), {
+        redirectTo: `${window.location.origin}/nova-senha`,
+      }),
+    )
 
     setOcupado(null)
-    if (error) setErro(mensagemDeErro(error.message))
+    if (falha) setErro(falha)
     else setEnviado('reset')
   }
+
+  /**
+   * Entrar dava certo e a tela continuava aqui: o `RequireAuth` só age nas
+   * rotas que ele embrulha, e `/entrar` não é uma delas. Do lado de fora, o
+   * botão parecia morto justamente quando a senha estava certa.
+   *
+   * A saída espera a sessão chegar ao provider — sair antes disso mandaria o
+   * `RequireAuth` devolver o usuário para cá.
+   */
+  if (entrou && session) return <Navigate to={destinoDe(location.state)} replace />
 
   if (enviado) {
     return (
@@ -154,11 +177,7 @@ export function LoginPage() {
         header={header}
         footer={
           <div className="flex flex-col gap-3">
-            <Button
-              type="submit"
-              full
-              disabled={!email.trim() || !senha || ocupado !== null}
-            >
+            <Button type="submit" full disabled={ocupado !== null}>
               {ocupado === 'senha' ? 'entrando…' : 'entrar'}
             </Button>
             <Button

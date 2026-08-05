@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { supabase } from '../../lib/supabase'
+import { chamarAuth } from './chamada'
 
 export const MINIMO_SENHA = 6
 
@@ -27,11 +28,15 @@ export function useNovaSenha() {
     setSalvando(true)
     setErro(null)
 
-    const { error } = await supabase.auth.updateUser({ password: senha })
+    // `updateUser` espera o lock interno do supabase-js: sem tempo limite, uma
+    // fila travada deixaria o botão em "salvando…" até recarregar a página
+    const falha = await chamarAuth(() =>
+      supabase.auth.updateUser({ password: senha }),
+    )
 
     setSalvando(false)
-    if (error) {
-      setErro(error.message.toLowerCase())
+    if (falha) {
+      setErro(falha)
       return
     }
     setPronto(true)
